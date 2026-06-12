@@ -1,0 +1,656 @@
+:root {
+  --energy: 0;
+  --light: 0;
+  --left: 0;
+  --right: 0;
+  --section: 0;
+  --sweep: 0;
+  --flash-left: 0;
+  --flash-right: 0;
+  color: #fff;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #07050d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 78, 174, 0.2), transparent 26rem),
+    linear-gradient(145deg, #0c0612 0%, #151023 52%, #07050d 100%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.18, 1), background 160ms ease, opacity 180ms ease;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+button:hover,
+.transport [role="button"]:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+#stage,
+#background,
+#shade {
+  position: fixed;
+  inset: 0;
+}
+
+#stage {
+  z-index: 2;
+  pointer-events: none;
+}
+
+#background {
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  filter: blur(16px) saturate(1.22) brightness(0.45);
+  opacity: 0.76;
+  transform: scale(calc(1.06 + var(--energy) * 0.04));
+  transition: background-image 320ms ease, transform 260ms ease;
+}
+
+#shade {
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, transparent 0%, rgba(7, 5, 13, 0.18) 40%, rgba(7, 5, 13, 0.82) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, calc(var(--light) * 0.11)), transparent 28%, transparent 72%, rgba(255, 255, 255, calc(var(--light) * 0.11)));
+}
+
+.app {
+  position: relative;
+  z-index: 3;
+  min-height: 100vh;
+}
+
+.visual {
+  position: relative;
+  min-height: 100vh;
+}
+
+.core {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(36vw, 380px);
+  min-width: 250px;
+  aspect-ratio: 1;
+  border: 5px solid rgba(255, 255, 255, 0.88);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 39% 33%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.22) 11%, transparent 12%),
+    radial-gradient(circle at 50% 54%, #ff82c9 0%, #f0419d 38%, #b61f72 67%, #43123d 100%);
+  text-transform: lowercase;
+  box-shadow: 0 0 64px rgba(255, 75, 172, 0.38);
+  transition:
+    width 520ms cubic-bezier(0.16, 1.16, 0.22, 1),
+    min-width 520ms cubic-bezier(0.16, 1.16, 0.22, 1),
+    border-width 420ms cubic-bezier(0.16, 1, 0.24, 1),
+    opacity 260ms ease;
+}
+
+.core-cover {
+  position: absolute;
+  inset: 18px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.6), transparent 14%),
+    linear-gradient(135deg, #ff75c2, #55245f);
+  background-position: center;
+  background-size: cover;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+  animation: coverRotate 46s linear infinite;
+}
+
+.app[data-panel="controls"] .core,
+.app[data-panel="scan"] .core,
+.app[data-panel="songs"] .core {
+  pointer-events: none;
+}
+
+.core::before {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.36);
+  border-radius: inherit;
+}
+
+.core::after {
+  content: "";
+  position: absolute;
+  inset: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: inherit;
+}
+
+.core-spin {
+  position: absolute;
+  inset: -28px;
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.44), transparent 28%, rgba(255, 127, 211, 0.52), transparent 68%);
+  opacity: calc(0.3 + var(--energy) * 0.48);
+  animation: rotate 13s linear infinite;
+}
+
+.core-subtitle {
+  position: absolute;
+  bottom: 42px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+  z-index: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+}
+
+.core-mini {
+  position: absolute;
+  bottom: 24px;
+  display: flex;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  letter-spacing: 0;
+  z-index: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+}
+
+.app[data-panel="controls"] .core-subtitle,
+.app[data-panel="scan"] .core-subtitle,
+.app[data-panel="songs"] .core-subtitle,
+.app[data-panel="controls"] .core-mini,
+.app[data-panel="scan"] .core-mini,
+.app[data-panel="songs"] .core-mini {
+  opacity: 0.24;
+}
+
+.app[data-panel="controls"] .core,
+.app[data-panel="scan"] .core,
+.app[data-panel="songs"] .core {
+  width: min(43vw, 440px);
+  min-width: 330px;
+  border-width: 4px;
+}
+
+.app[data-panel="songs"] .core {
+  left: 48%;
+}
+
+.halo {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.17);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(calc(1 + var(--energy) * 0.16));
+  opacity: calc(0.09 + var(--energy) * 0.2);
+  transition: opacity 220ms ease, transform 120ms linear;
+}
+
+.halo-a {
+  width: min(46vw, 520px);
+}
+
+.halo-b {
+  width: min(57vw, 660px);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translate(-50%, -50%) scale(calc(1 + var(--light) * 0.12));
+}
+
+.control-panel {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  width: min(390px, 88vw);
+  transform: translateY(-16px) scale(0.98);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 8;
+  padding: 10px 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(10, 8, 18, 0.72);
+  backdrop-filter: blur(16px);
+  transition: transform 440ms cubic-bezier(0.16, 1.14, 0.22, 1), opacity 240ms ease;
+}
+
+.app[data-panel="controls"] .control-panel,
+.app[data-panel="scan"] .control-panel,
+.app[data-panel="songs"] .control-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.now {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 18px 18px 8px;
+  border-radius: 999px 999px 8px 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), transparent);
+}
+
+.cover {
+  width: 54px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.82), transparent 18%),
+    linear-gradient(135deg, #ff6fbd, #44215a);
+  background-position: center;
+  background-size: cover;
+}
+
+.now p {
+  margin: 0;
+}
+
+#track-title {
+  overflow: hidden;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#track-meta {
+  margin-top: 3px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  width: calc(100% - 32px);
+  margin: 8px 16px 0;
+  accent-color: #ff66b6;
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 18px 8px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+}
+
+.transport,
+.orbit-actions {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.transport {
+  grid-template-columns: 1fr 1.2fr 1fr;
+}
+
+.transport [role="button"] {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.18, 1), background 160ms ease, opacity 180ms ease;
+}
+
+.orbit-actions {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 8px;
+}
+
+.transport button,
+.orbit-actions button,
+.scan-actions button,
+.panel-title button {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.status {
+  min-height: 35px;
+  margin: 10px 16px 0;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 13px;
+}
+
+.float-panel {
+  position: fixed;
+  top: 50%;
+  width: min(390px, 88vw);
+  max-height: min(76vh, 720px);
+  padding: 16px 18px 16px 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: linear-gradient(115deg, rgba(255, 75, 172, 0.16), rgba(12, 8, 20, 0.78) 22%, rgba(12, 8, 20, 0.7));
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+  clip-path: polygon(7% 0, 100% 0, 93% 100%, 0 100%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 9;
+  transition: transform 360ms cubic-bezier(0.18, 0.9, 0.18, 1), opacity 220ms ease;
+}
+
+.wedge-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.14), transparent 32%),
+    radial-gradient(circle at 12% 18%, rgba(255, 113, 202, 0.2), transparent 22rem);
+  opacity: calc(0.45 + var(--energy) * 0.35);
+}
+
+.scan-panel {
+  left: 28px;
+  transform: translate(-12%, -50%) scale(0.94);
+}
+
+.song-panel {
+  right: 28px;
+  width: min(460px, 40vw);
+  transform: translate(12%, -50%) scale(0.94) skewX(-2deg);
+}
+
+.app[data-panel="scan"] .scan-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, -50%) scale(1) skewX(-2deg);
+}
+
+.app[data-panel="songs"] .song-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, -50%) scale(1);
+}
+
+.panel-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panel-title p {
+  margin: 0;
+  color: #ff9bd2;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+}
+
+input {
+  width: 100%;
+  min-width: 0;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.32);
+  padding: 11px 12px;
+}
+
+.scan-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.search {
+  margin-bottom: 10px;
+}
+
+.track-list {
+  max-height: calc(min(76vh, 720px) - 104px);
+  overflow: auto;
+  padding: 4px 16px 4px 0;
+}
+
+.track {
+  display: block;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 12px 18px 12px 26px;
+  text-align: left;
+  border-width: 0;
+  border-left: 4px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, rgba(255, 90, 186, 0.22), rgba(255, 255, 255, 0.08) 42%, rgba(255, 255, 255, 0.04)),
+    rgba(255, 255, 255, 0.04);
+  clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
+  opacity: 0;
+  transform: translateX(36px) skewX(-5deg);
+  animation: trackIn 360ms cubic-bezier(0.16, 1, 0.2, 1) forwards;
+  animation-delay: calc(var(--i) * 18ms);
+}
+
+.track.active {
+  border-left-color: rgba(255, 240, 252, 0.94);
+  background:
+    linear-gradient(90deg, rgba(255, 77, 177, 0.54), rgba(255, 126, 208, 0.22) 54%, rgba(255, 255, 255, 0.07)),
+    rgba(255, 77, 177, 0.24);
+  box-shadow: 0 0 28px rgba(255, 77, 177, 0.26);
+}
+
+.track:hover {
+  transform: translateX(-8px) skewX(-5deg);
+}
+
+.track span,
+.track small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track small {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.scythe {
+  position: fixed;
+  top: 50%;
+  width: clamp(300px, 39vw, 560px);
+  height: min(94vh, 880px);
+  pointer-events: none;
+  opacity: 0;
+  filter: drop-shadow(0 0 calc(12px + var(--light) * 36px) rgba(255, 255, 255, 0.62));
+  mix-blend-mode: screen;
+  transition: opacity 70ms ease-out, transform 90ms cubic-bezier(0.16, 1, 0.3, 1), filter 140ms ease-out;
+  will-change: opacity, transform, filter;
+}
+
+.scythe-left {
+  left: calc(clamp(160px, 26vw, 360px) * -1);
+  opacity: var(--flash-left);
+  transform: translateY(-50%) translateX(calc(-18px + var(--flash-left) * 30px)) scaleX(1.02);
+}
+
+.scythe-right {
+  right: calc(clamp(160px, 26vw, 360px) * -1);
+  opacity: var(--flash-right);
+  transform: translateY(-50%) translateX(calc(18px - var(--flash-right) * 30px)) scaleX(-1.02);
+}
+
+.side-slice {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 100% 50%,
+      transparent 0 30%,
+      rgba(255, 255, 255, 0.12) 34%,
+      rgba(255, 255, 255, 0.88) 42%,
+      rgba(255, 255, 255, 0.62) 50%,
+      rgba(255, 255, 255, 0.18) 59%,
+      transparent 68%);
+  -webkit-mask:
+    radial-gradient(ellipse at 100% 50%,
+      transparent 0 32%,
+      #000 36% 59%,
+      transparent 66%);
+  mask:
+    radial-gradient(ellipse at 100% 50%,
+      transparent 0 32%,
+      #000 36% 59%,
+      transparent 66%);
+  transform-origin: 100% 50%;
+  will-change: opacity, transform, filter;
+}
+
+.side-slice-wash {
+  inset: -5% -10% -5% -8%;
+  opacity: calc(0.38 + var(--light) * 0.28);
+  filter: blur(calc(20px + var(--light) * 22px));
+  transform: scaleX(calc(1.05 + var(--sweep) * 0.035)) scaleY(1.03);
+}
+
+.side-slice-body {
+  inset: 1% 1% 1% 4%;
+  opacity: calc(0.58 + var(--light) * 0.3);
+  filter: blur(3px);
+  transform: scaleX(calc(0.96 + var(--sweep) * 0.025));
+}
+
+.side-slice-hot {
+  inset: 7% 4% 7% 20%;
+  opacity: calc(0.74 + var(--light) * 0.22);
+  filter: blur(0.9px);
+  background:
+    radial-gradient(ellipse at 100% 50%,
+      transparent 0 38%,
+      rgba(255, 255, 255, 0.24) 40%,
+      rgba(255, 255, 255, 1) 45%,
+      rgba(255, 255, 255, 0.76) 49%,
+      rgba(255, 255, 255, 0.16) 55%,
+      transparent 62%);
+  -webkit-mask:
+    radial-gradient(ellipse at 100% 50%,
+      transparent 0 39%,
+      #000 42% 53%,
+      transparent 60%);
+  mask:
+    radial-gradient(ellipse at 100% 50%,
+      transparent 0 39%,
+      #000 42% 53%,
+      transparent 60%);
+  transform: scaleX(calc(0.92 + var(--sweep) * 0.045));
+}
+
+.app:not([data-panel="idle"]) .scythe {
+  filter: drop-shadow(0 0 calc(10px + var(--light) * 30px) rgba(255, 255, 255, 0.54));
+}
+
+.app[data-panel="idle"] .control-panel,
+.app[data-panel="idle"] .float-panel {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.is-idle .core {
+  width: min(38vw, 400px);
+}
+
+audio {
+  display: none;
+}
+
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes coverRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes trackIn {
+  to {
+    opacity: 1;
+    transform: translateX(0) skewX(-5deg);
+  }
+}
+
+@media (max-width: 980px) {
+  .core {
+    width: min(68vw, 340px);
+  }
+
+  .scan-panel,
+  .song-panel {
+    top: auto;
+    left: 50%;
+    right: auto;
+    bottom: 22px;
+    transform: translate(-50%, 18px) scale(0.96);
+  }
+
+  .app[data-panel="scan"] .scan-panel,
+  .app[data-panel="songs"] .song-panel {
+    transform: translate(-50%, 0) scale(1);
+  }
+
+  .scythe {
+    width: clamp(260px, 48vw, 360px);
+    height: 86vh;
+  }
+
+  .scythe-left {
+    left: calc(clamp(135px, 24vw, 230px) * -1);
+  }
+
+  .scythe-right {
+    right: calc(clamp(135px, 24vw, 230px) * -1);
+  }
+}

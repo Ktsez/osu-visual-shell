@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>osu! 视觉播放器</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="background"></div>
+    <div id="shade"></div>
+
+    <main id="app" class="app" data-panel="idle">
+      <section class="visual" aria-label="视觉播放器">
+        <div class="scythe scythe-left" aria-hidden="true">
+          <span class="side-slice side-slice-wash"></span>
+          <span class="side-slice side-slice-body"></span>
+          <span class="side-slice side-slice-hot"></span>
+        </div>
+        <div class="scythe scythe-right" aria-hidden="true">
+          <span class="side-slice side-slice-wash"></span>
+          <span class="side-slice side-slice-body"></span>
+          <span class="side-slice side-slice-hot"></span>
+        </div>
+
+        <div class="halo halo-a"></div>
+        <div class="halo halo-b"></div>
+
+        <div id="core" class="core" role="button" tabindex="0" aria-label="打开音乐控制">
+          <span class="core-spin"></span>
+          <span id="core-cover" class="core-cover"></span>
+          <span id="core-subtitle" class="core-subtitle">点击打开</span>
+          <span class="core-mini">
+            <span id="mini-state">就绪</span>
+            <span id="mini-time">0:00</span>
+          </span>
+        </div>
+
+        <div id="control-panel" class="control-panel dock-panel" aria-label="音乐控制">
+          <div class="panel-title">
+            <p>音乐控制</p>
+            <button id="minimize-controls" type="button">最小化</button>
+          </div>
+          <div class="now">
+            <div id="cover" class="cover"></div>
+            <div>
+              <p id="track-title">未选择歌曲</p>
+              <p id="track-meta">请先扫描本地曲库</p>
+            </div>
+          </div>
+
+          <input id="progress" class="progress" type="range" min="0" max="1000" value="0" aria-label="歌曲进度" />
+          <div class="time-row">
+            <span id="time-current">0:00</span>
+            <span id="time-total">0:00</span>
+          </div>
+
+          <div class="transport">
+            <div id="prev" role="button" tabindex="0" onpointerdown="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'prev' }))" onclick="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'prev' }))">上一首</div>
+            <div id="toggle-play" role="button" tabindex="0" onpointerdown="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'toggle-play' }))" onclick="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'toggle-play' }))">播放</div>
+            <div id="next" role="button" tabindex="0" onpointerdown="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'next' }))" onclick="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'next' }))">下一首</div>
+          </div>
+
+          <div class="orbit-actions">
+            <button id="open-scan" type="button">扫描</button>
+            <button id="open-library" type="button">歌曲列表</button>
+          </div>
+
+          <p id="status" class="status">就绪。可以检测本地 osu! Songs。</p>
+        </div>
+
+        <section id="scan-panel" class="float-panel scan-panel wedge-panel" aria-label="扫描文件夹">
+          <div class="panel-title">
+            <p>曲库来源</p>
+            <button id="close-scan" type="button">关闭</button>
+          </div>
+          <label>
+            <span>文件夹路径</span>
+            <input id="folder-path" placeholder="C:\Users\You\AppData\Local\osu!\Songs" />
+          </label>
+          <div class="scan-actions">
+            <button id="detect-osu" type="button">检测 osu!</button>
+            <button id="scan-osu" type="button">扫描 osu! Songs</button>
+            <button id="scan-music" type="button">扫描普通音乐</button>
+          </div>
+        </section>
+
+        <section id="song-panel" class="float-panel song-panel wedge-panel" aria-label="选择歌曲">
+          <div class="panel-title">
+            <p id="song-count">歌曲</p>
+            <button id="close-library" type="button">关闭</button>
+          </div>
+          <input id="search" class="search" placeholder="筛选歌曲" />
+          <div id="list" class="track-list" aria-label="歌曲列表"></div>
+        </section>
+      </section>
+    </main>
+
+    <audio id="audio" crossorigin="anonymous"></audio>
+    <script type="module" src="/src/main.js?v=20260612-scythe-slice-rebuild"></script>
+  </body>
+</html>
