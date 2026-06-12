@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260612-side-light-stage-fill';
+window.__appVersion = '20260612-lightfield-logo-fountain';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -11,6 +11,7 @@ const miniTime = document.querySelector('#mini-time');
 const controlPanel = document.querySelector('#control-panel');
 const scanPanel = document.querySelector('#scan-panel');
 const songPanel = document.querySelector('#song-panel');
+const settingsPanel = document.querySelector('#settings-panel');
 const folderPath = document.querySelector('#folder-path');
 const statusEl = document.querySelector('#status');
 const listEl = document.querySelector('#list');
@@ -25,6 +26,13 @@ const trackMeta = document.querySelector('#track-meta');
 const cover = document.querySelector('#cover');
 const songCount = document.querySelector('#song-count');
 const minimizeControls = document.querySelector('#minimize-controls');
+const settingsInputs = {
+  sideIntensity: document.querySelector('#setting-side-intensity'),
+  sideRestraint: document.querySelector('#setting-side-restraint'),
+  pulse: document.querySelector('#setting-pulse'),
+  visualizer: document.querySelector('#setting-visualizer'),
+  fountain: document.querySelector('#setting-fountain'),
+};
 
 let tracks = [];
 let visibleTracks = [];
@@ -46,8 +54,12 @@ let lightSweep = 0;
 let continuousBeat = 0;
 let leftFlash = 0;
 let rightFlash = 0;
-let leftEnvelope = null;
-let rightEnvelope = null;
+let sideEnvelopes = {
+  leftSoft: null,
+  rightSoft: null,
+  leftHard: null,
+  rightHard: null,
+};
 let beatAccent = 0;
 let beatWindow = 0;
 let lastScytheAt = -10000;
@@ -68,22 +80,45 @@ let lastInteraction = performance.now();
 let lastFrameAt = performance.now();
 let draggingProgress = false;
 let particles = [];
+let starParticles = [];
+let fountainBursts = [];
 let scytheEvents = [];
 let debugScaleMin = 99;
 let debugScaleMax = 0;
 let lastTransportAction = 0;
 let lastUiActionAt = 0;
+let lastKiaiState = false;
+let lastFountainAt = -10000;
+let coreHover = false;
+let pointerX = window.innerWidth * 0.5;
+let pointerY = window.innerHeight * 0.5;
+let coreFollowX = 0;
+let coreFollowY = 0;
+let coreFlash = 0;
+let lastVisualizerUpdate = 0;
+let visualizerOffset = 0;
+
+const visualizerBars = new Float32Array(200);
+const settings = {
+  sideIntensity: 1,
+  sideRestraint: 0.55,
+  pulse: 1,
+  visualizer: 1,
+  fountain: 1,
+};
 
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
+const settingsKey = 'osu-visual-shell-settings-v1';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
-  document.body.classList.remove('is-idle');
+  if (panel || app.dataset.panel !== 'idle') document.body.classList.remove('is-idle');
   if (panel) {
     markUiAction();
     app.dataset.panel = panel;
+    if (panel !== 'idle') coreHover = false;
   }
 }
 
@@ -92,7 +127,31 @@ function setStatus(text) {
 }
 
 function setPanel(panel) {
+  if (panel === 'idle') {
+    markUiAction();
+    setIdlePanel();
+    return;
+  }
   touch(panel);
+}
+
+function loadSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+    Object.assign(settings, saved);
+  } catch {
+    // Keep defaults when local storage contains invalid data.
+  }
+
+  for (const [key, input] of Object.entries(settingsInputs)) {
+    if (!input) continue;
+    input.value = String(settings[key]);
+    input.addEventListener('input', () => {
+      settings[key] = Number(input.value);
+      localStorage.setItem(settingsKey, JSON.stringify(settings));
+      touch('settings');
+    });
+  }
 }
 
 function markUiAction() {
@@ -102,6 +161,7 @@ function markUiAction() {
 function setIdlePanel() {
   lastInteraction = performance.now();
   app.dataset.panel = 'idle';
+  coreHover = false;
   document.body.classList.add('is-idle');
 }
 
@@ -266,20 +326,29 @@ async function playIndex(index) {
   beatWindow = 0;
   leftFlash = 0;
   rightFlash = 0;
-  leftEnvelope = null;
-  rightEnvelope = null;
+  sideEnvelopes = {
+    leftSoft: null,
+    rightSoft: null,
+    leftHard: null,
+    rightHard: null,
+  };
   lastDrive = 0;
   currentDrive = 0;
   currentRise = 0;
   driveAverage = 0;
   riseAverage = 0;
   scytheEvents = [];
+  starParticles = [];
+  fountainBursts = [];
+  lastKiaiState = Boolean(activeEffectPoint?.kiai);
+  lastFountainAt = -10000;
+  visualizerBars.fill(0);
   markActiveTrack();
   setStatus(track.timingPoints?.length ? `已读取 ${track.timingPoints.length} 个 timing points。` : '已载入，使用音频分析。');
 
   try {
     setupAudioGraph();
-    audioContext.resume().catch(() => {});
+    await audioContext.resume().catch(() => {});
     playButton.textContent = '暂停';
     const playPromise = audio.play();
     if (playPromise) {
@@ -332,7 +401,7 @@ async function togglePlay() {
 
   try {
     setupAudioGraph();
-    audioContext.resume().catch(() => {});
+    await audioContext.resume().catch(() => {});
     if (audio.paused) {
       try {
         await audio.play();
@@ -402,8 +471,16 @@ function updateTiming() {
     lastBeatTimingPoint = null;
     sectionHeat = Math.max(sectionHeat, 0.9);
     beatAccent = Math.max(beatAccent, 0.78);
+    coreFlash = Math.max(coreFlash, 0.74);
   }
   activeEffectPoint = effectPoint;
+
+  const kiaiNow = Boolean(effectPoint?.kiai);
+  if (kiaiNow && !lastKiaiState && Math.abs(syncMs - effectPoint.offset) < 1100) {
+    triggerStarFountain(1.05, 'kiai-start');
+    coreFlash = Math.max(coreFlash, 1);
+  }
+  lastKiaiState = kiaiNow;
 
   const beatLengthSeconds = point.beatLength / 1000;
   currentBeatLengthMs = point.beatLength;
@@ -427,13 +504,16 @@ function updateTiming() {
     sectionHeat = Math.max(sectionHeat, 0.78);
     beatAccent = Math.max(beatAccent, 1);
     beatWindow = 1;
-    spawnBurst(12 + Math.min(18, meter * 3));
+    coreFlash = Math.max(coreFlash, 0.92);
+    if (kiaiNow || currentDrive > driveAverage + 0.08 || currentRise > Math.max(0.06, riseAverage * 2.4)) {
+      triggerStarFountain(kiaiNow ? 0.8 : 0.55, 'strong-downbeat');
+    }
   } else {
     beatAccent = Math.max(beatAccent, 0.42);
     beatWindow = Math.max(beatWindow, 0.55);
   }
 
-  handleOsuSideFlashBeat(beatIndex, meter, Boolean(effectPoint?.kiai), timeSinceBeat);
+  handleOsuSideFlashBeat(beatIndex, meter, kiaiNow, timeSinceBeat);
 }
 
 function osuSideAlpha(channel, kiai) {
@@ -442,13 +522,13 @@ function osuSideAlpha(channel, kiai) {
   const kiaiMultiplier = (1 - amplitudeDeadZone * 0.95) / 0.8;
   const multiplier = kiai ? kiaiMultiplier : alphaMultiplier;
   const originalAlpha = 0.1 + (channel - amplitudeDeadZone) / multiplier;
-  const base = kiai ? 0.24 : 0.08;
+  const base = kiai ? 0.22 : 0.05;
   const drive = Math.max(channel, lowEnergy * 0.82, currentDrive * 0.64, smoothedEnergy * 0.72);
-  const audioLift = Math.sqrt(Math.max(0, drive)) * (kiai ? 0.44 : 0.3);
-  const riseLift = Math.min(kiai ? 0.16 : 0.1, currentRise * 1.5);
+  const audioLift = Math.sqrt(Math.max(0, drive)) * (kiai ? 0.42 : 0.22);
+  const riseLift = Math.min(kiai ? 0.16 : 0.08, currentRise * 1.35);
   const liftedAlpha = base + audioLift + riseLift;
-  const floor = kiai ? base : 0.06;
-  return Math.max(floor, Math.min(0.94, Math.max(originalAlpha, liftedAlpha)));
+  const floor = kiai ? base : 0;
+  return Math.max(floor, Math.min(0.94, Math.max(originalAlpha, liftedAlpha))) * settings.sideIntensity;
 }
 
 function beatIndexAtTimeMs(currentTrackTime, point) {
@@ -464,23 +544,32 @@ function timeSinceBeatMs(currentTrackTime, point) {
   return raw < 0 ? raw + beatLengthMs : raw;
 }
 
-function flashSide(side, amount, reason = 'beat', beatIndex = lastBeatIndex, timeSinceBeat = 0) {
-  const clamped = Math.max(0.18, Math.min(0.96, amount));
+function flashSide(side, amount, layer = 'soft', reason = 'beat', beatIndex = lastBeatIndex, timeSinceBeat = 0) {
+  const clamped = Math.max(layer === 'hard' ? 0.18 : 0.08, Math.min(1.1, amount));
   const now = performance.now();
   const startedAt = now - Math.max(0, timeSinceBeat);
+  const hard = layer === 'hard';
   const makeEnvelope = (existing) => ({
     start: startedAt,
     peak: Math.max(clamped, envelopeValue(existing, now) * 0.9),
-    beatLength: Math.max(260, currentBeatLengthMs || 620),
+    beatLength: Math.max(hard ? 420 : 260, (currentBeatLengthMs || 620) * (hard ? 1.1 : 0.82)),
+    layer,
   });
-  if (side === 'left' || side === 'both') leftEnvelope = makeEnvelope(leftEnvelope);
-  if (side === 'right' || side === 'both') rightEnvelope = makeEnvelope(rightEnvelope);
-  lightEnergy = Math.max(lightEnergy, clamped * 0.66);
-  lightSweep = Math.max(lightSweep, clamped * 0.72);
+  if (side === 'left' || side === 'both') {
+    const key = hard ? 'leftHard' : 'leftSoft';
+    sideEnvelopes[key] = makeEnvelope(sideEnvelopes[key]);
+  }
+  if (side === 'right' || side === 'both') {
+    const key = hard ? 'rightHard' : 'rightSoft';
+    sideEnvelopes[key] = makeEnvelope(sideEnvelopes[key]);
+  }
+  lightEnergy = Math.max(lightEnergy, clamped * (hard ? 0.78 : 0.42));
+  lightSweep = Math.max(lightSweep, clamped * (hard ? 0.86 : 0.48));
   scytheEvents.push({
     at: Number((audio.currentTime || 0).toFixed(3)),
     reason,
     side,
+    layer,
     amount: Number(clamped.toFixed(3)),
     beat: beatIndex,
     kiai: Boolean(activeEffectPoint?.kiai),
@@ -490,27 +579,43 @@ function flashSide(side, amount, reason = 'beat', beatIndex = lastBeatIndex, tim
 
 function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0) {
   const downbeat = beatIndex % Math.max(1, meter) === 0;
+  const activity = Math.max(lowEnergy, midEnergy * 0.82, smoothedEnergy, currentDrive * 0.72);
+  const lift = Math.max(0, activity - driveAverage);
+  const strongRise = currentRise > Math.max(0.055, riseAverage * (2.25 - settings.sideRestraint * 0.55));
+  const strongMoment = downbeat && (kiaiTagged || activity > 0.36 + settings.sideRestraint * 0.12 || lift > 0.1 || strongRise);
 
   if (kiaiTagged) {
+    const layer = strongMoment ? 'hard' : 'soft';
     if (beatIndex % 2 === 0) {
-      const amount = osuSideAlpha(leftEnergy, true);
-      flashSide('left', amount, 'kiai-left', beatIndex, timeSinceBeat);
+      const amount = osuSideAlpha(leftEnergy, true) * (layer === 'hard' ? 1 : 0.68);
+      flashSide('left', amount, layer, `kiai-${layer}-left`, beatIndex, timeSinceBeat);
     } else {
-      const amount = osuSideAlpha(rightEnergy, true);
-      flashSide('right', amount, 'kiai-right', beatIndex, timeSinceBeat);
+      const amount = osuSideAlpha(rightEnergy, true) * (layer === 'hard' ? 1 : 0.68);
+      flashSide('right', amount, layer, `kiai-${layer}-right`, beatIndex, timeSinceBeat);
+    }
+
+    if (strongMoment) {
+      const bothAmount = Math.max(osuSideAlpha(leftEnergy, true), osuSideAlpha(rightEnergy, true)) * 0.76;
+      flashSide('both', bothAmount, 'hard', 'kiai-downbeat-both', beatIndex, timeSinceBeat);
     }
     return;
   }
 
-  if (downbeat) {
-    const leftAmount = osuSideAlpha(leftEnergy, false);
-    const rightAmount = osuSideAlpha(rightEnergy, false);
-    const normalActivity = Math.max(lowEnergy, midEnergy * 0.82, smoothedEnergy, currentDrive * 0.72);
-    const enoughPresence = Math.max(leftAmount, rightAmount) > 0.3 || normalActivity > 0.26 || currentRise > 0.045;
-    if (!enoughPresence) return;
+  if (!downbeat && !(strongRise && activity > 0.31 + settings.sideRestraint * 0.08)) return;
 
-    flashSide('left', leftAmount, 'downbeat-left', beatIndex, timeSinceBeat);
-    flashSide('right', rightAmount, 'downbeat-right', beatIndex, timeSinceBeat);
+  const enoughPresence = activity > 0.24 + settings.sideRestraint * 0.18 || strongRise;
+  if (!enoughPresence) return;
+
+  const layer = strongMoment ? 'hard' : 'soft';
+  const side = beatIndex % 2 === 0 ? 'left' : 'right';
+  const leftAmount = osuSideAlpha(leftEnergy, false);
+  const rightAmount = osuSideAlpha(rightEnergy, false);
+  const amount = side === 'left' ? leftAmount : rightAmount;
+
+  if (layer === 'hard') {
+    flashSide('both', Math.max(leftAmount, rightAmount) * 0.88, 'hard', 'normal-downbeat-both', beatIndex, timeSinceBeat);
+  } else {
+    flashSide(side, amount * 0.7, 'soft', `normal-soft-${side}`, beatIndex, timeSinceBeat);
   }
 }
 
@@ -581,6 +686,26 @@ function updateAudioEnergy() {
   lastDrive = drive;
 }
 
+function updateLogoAmplitudes(now, elapsed) {
+  const decayFactor = elapsed * 0.0024;
+  for (let i = 0; i < visualizerBars.length; i += 1) {
+    visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
+    if (visualizerBars[i] < 0) visualizerBars[i] = 0;
+  }
+
+  if (!freqData || audio.paused || now - lastVisualizerUpdate < 50) return;
+  lastVisualizerUpdate = now;
+
+  const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
+  for (let i = 0; i < visualizerBars.length; i += 1) {
+    const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
+    const raw = (freqData[sourceIndex] || 0) / 255;
+    const target = Math.max(0, raw - 0.012) * kiaiMultiplier * settings.visualizer;
+    if (target > visualizerBars[i]) visualizerBars[i] = Math.min(0.52, target);
+  }
+  visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
+}
+
 function spawnBurst(count = 10) {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -601,6 +726,93 @@ function spawnBurst(count = 10) {
   particles = particles.slice(-320);
 }
 
+function triggerStarFountain(power = 1, reason = 'kiai') {
+  if (settings.fountain <= 0.02) return;
+  const now = performance.now();
+  const cooldown = reason === 'kiai-start' ? 900 : 2400 - settings.fountain * 520;
+  if (now - lastFountainAt < cooldown) return;
+  lastFountainAt = now;
+
+  const direction = Math.floor(Math.random() * 3) - 1;
+  fountainBursts.push({
+    start: now,
+    end: now + 760 + power * 180,
+    power: power * settings.fountain,
+    direction,
+    lastSpawn: now - 20,
+  });
+  fountainBursts = fountainBursts.slice(-4);
+}
+
+function updateStarFountains(now, elapsed) {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const originOffset = Math.min(260, Math.max(120, width * 0.16));
+  const dt = elapsed / 1000;
+
+  for (const burst of fountainBursts) {
+    if (now > burst.end) continue;
+
+    const spawnEvery = 1000 / (80 + burst.power * 80);
+    while (now - burst.lastSpawn >= spawnEvery) {
+      burst.lastSpawn += spawnEvery;
+      for (const side of [-1, 1]) {
+        const age = burst.lastSpawn - burst.start;
+        const progress = Math.max(0, Math.min(1, age / (burst.end - burst.start)));
+        const x = side < 0 ? originOffset : width - originOffset;
+        const y = height + 18;
+        const fan = burst.direction * side * 360 * (1 - progress * 1.8);
+        const vx = fan + (Math.random() - 0.5) * 150;
+        const vy = -760 - Math.random() * 360 - burst.power * 190;
+        starParticles.push({
+          x,
+          y,
+          vx,
+          vy,
+          gravity: 900,
+          age: 0,
+          duration: 460 + Math.random() * 640,
+          size: 4.2 + Math.random() * 5.8,
+          rotation: Math.random() * Math.PI * 2,
+          spin: (Math.random() - 0.5) * 7,
+        });
+      }
+    }
+  }
+
+  fountainBursts = fountainBursts.filter((burst) => now <= burst.end);
+  for (const particle of starParticles) {
+    particle.age += elapsed;
+    particle.vy += particle.gravity * dt;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.rotation += particle.spin * dt;
+  }
+  starParticles = starParticles.filter((particle) => particle.age < particle.duration && particle.y < height + 80);
+}
+
+function drawStar(ctx, x, y, radius, rotation, alpha) {
+  const inner = radius * 0.46;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.beginPath();
+  for (let i = 0; i < 10; i += 1) {
+    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 === 0 ? radius : inner;
+    const px = Math.cos(angle) * r;
+    const py = Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+  ctx.shadowColor = `rgba(255, 255, 255, ${alpha})`;
+  ctx.shadowBlur = 10 + radius * 1.2;
+  ctx.fill();
+  ctx.restore();
+}
+
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
   const mins = Math.floor(seconds / 60);
@@ -619,25 +831,34 @@ function updateProgress() {
 
 function draw() {
   requestAnimationFrame(draw);
+  try {
   const now = performance.now();
   const elapsed = Math.min(80, now - lastFrameAt);
   lastFrameAt = now;
 
   updateAudioEnergy();
+  updateLogoAmplitudes(now, elapsed);
   updateTiming();
   updateProgress();
+  updateStarFountains(now, elapsed);
 
   timingPulse *= Math.exp(-elapsed / 88);
   logoPulse *= Math.exp(-elapsed / 102);
   sectionHeat *= Math.exp(-elapsed / 1500);
   beatAccent *= Math.exp(-elapsed / 190);
   beatWindow *= Math.exp(-elapsed / 115);
+  coreFlash *= Math.exp(-elapsed / 145);
   lightEnergy *= Math.exp(-elapsed / 420);
   lightSweep *= Math.exp(-elapsed / 260);
-  leftFlash = envelopeValue(leftEnvelope, now);
-  rightFlash = envelopeValue(rightEnvelope, now);
-  if (!envelopeAlive(leftEnvelope, now)) leftEnvelope = null;
-  if (!envelopeAlive(rightEnvelope, now)) rightEnvelope = null;
+  const leftSoft = envelopeValue(sideEnvelopes.leftSoft, now);
+  const rightSoft = envelopeValue(sideEnvelopes.rightSoft, now);
+  const leftHard = envelopeValue(sideEnvelopes.leftHard, now);
+  const rightHard = envelopeValue(sideEnvelopes.rightHard, now);
+  leftFlash = Math.max(leftSoft, leftHard);
+  rightFlash = Math.max(rightSoft, rightHard);
+  for (const key of Object.keys(sideEnvelopes)) {
+    if (!envelopeAlive(sideEnvelopes[key], now)) sideEnvelopes[key] = null;
+  }
 
   if (now - lastInteraction > idleAfterMs && app.dataset.panel !== 'idle') {
     app.dataset.panel = 'idle';
@@ -651,7 +872,13 @@ function draw() {
   const beatMotion = !audio.paused ? continuousBeat * 0.045 : 0;
   const energy = Math.max(smoothedEnergy * 1.35, logoPulse * 0.86, timingPulse * 0.62, beatMotion);
   const earlyDip = timingPulse > 0.5 ? -0.012 * Math.min(1, timingPulse) : 0;
-  const coreScale = 1 + energy * 0.16 + earlyDip;
+  const coreRect = core.getBoundingClientRect();
+  const targetFollowX = coreHover ? Math.max(-9, Math.min(9, (pointerX - (coreRect.left + coreRect.width / 2)) * 0.045)) : 0;
+  const targetFollowY = coreHover ? Math.max(-9, Math.min(9, (pointerY - (coreRect.top + coreRect.height / 2)) * 0.045)) : 0;
+  coreFollowX += (targetFollowX - coreFollowX) * Math.min(1, elapsed / 120);
+  coreFollowY += (targetFollowY - coreFollowY) * Math.min(1, elapsed / 120);
+  const hoverBoost = coreHover ? 0.045 : 0;
+  const coreScale = 1 + (energy * 0.16 + timingPulse * 0.035) * settings.pulse + hoverBoost + earlyDip;
   debugScaleMin = Math.min(debugScaleMin, coreScale);
   debugScaleMax = Math.max(debugScaleMax, coreScale);
   window.__visualDebug = {
@@ -664,18 +891,26 @@ function draw() {
     lightSweep,
     leftFlash,
     rightFlash,
-    leftEnvelope,
-    rightEnvelope,
+    leftSoft,
+    rightSoft,
+    leftHard,
+    rightHard,
+    sideEnvelopes,
     beatAccent,
+    coreFlash,
     scytheEvents,
     scytheEventCount: scytheEvents.length,
+    starParticles: starParticles.length,
+    fountainBursts: fountainBursts.length,
+    settings,
     paused: audio.paused,
     currentTime: audio.currentTime,
   };
-  core.style.transform = `translate(-50%, -50%) scale(${coreScale})`;
-  core.style.boxShadow = `0 0 ${54 + energy * 170}px rgba(255, 72, 169, ${0.34 + energy * 0.5})`;
+  core.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale})`;
+  core.style.boxShadow = `0 0 ${54 + energy * 170 + coreFlash * 80}px rgba(255, 72, 169, ${Math.min(0.9, 0.34 + energy * 0.5 + coreFlash * 0.22)})`;
 
   document.documentElement.style.setProperty('--energy', energy.toFixed(3));
+  document.documentElement.style.setProperty('--core-flash', Math.min(1, coreFlash).toFixed(3));
   const visualLight = Math.max(lightEnergy, sectionHeat * 0.12);
   document.documentElement.style.setProperty('--light', Math.min(1.25, visualLight).toFixed(3));
   document.documentElement.style.setProperty('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(3));
@@ -684,22 +919,13 @@ function draw() {
   document.documentElement.style.setProperty('--sweep', lightSweep.toFixed(3));
   document.documentElement.style.setProperty('--flash-left', Math.min(1, leftFlash).toFixed(3));
   document.documentElement.style.setProperty('--flash-right', Math.min(1, rightFlash).toFixed(3));
+  document.documentElement.style.setProperty('--left-soft', Math.min(1, leftSoft).toFixed(3));
+  document.documentElement.style.setProperty('--right-soft', Math.min(1, rightSoft).toFixed(3));
+  document.documentElement.style.setProperty('--left-hard', Math.min(1, leftHard).toFixed(3));
+  document.documentElement.style.setProperty('--right-hard', Math.min(1, rightHard).toFixed(3));
 
   const cx = width * 0.5;
   const cy = height * 0.5;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(now / 4200);
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.05 + energy * 0.16})`;
-  ctx.lineWidth = 1.5 + energy * 5;
-  for (let i = 0; i < 5; i += 1) {
-    const radius = 154 + i * 44 + energy * 22;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, -0.4 + i * 0.18, Math.PI * 1.12 + i * 0.16);
-    ctx.stroke();
-  }
-  ctx.restore();
-
   drawLogoVisualizer(cx, cy, energy);
 
   for (const particle of particles) {
@@ -714,36 +940,64 @@ function draw() {
     ctx.fill();
   }
   particles = particles.filter((particle) => particle.life > 0.04);
+
+  for (const particle of starParticles) {
+    const progress = particle.age / particle.duration;
+    const alpha = Math.max(0, (1 - progress) * 0.92);
+    drawStar(ctx, particle.x, particle.y, particle.size * (1 + progress * 1.25), particle.rotation, alpha);
+  }
+  } catch (error) {
+    window.__visualError = error?.stack || String(error);
+  }
 }
 
 function drawLogoVisualizer(cx, cy, energy) {
-  const bars = 96;
-  const baseRadius = Math.min(window.innerWidth, window.innerHeight) * 0.225;
+  const bars = visualizerBars.length;
+  const visualiserRounds = 5;
+  const coreSize = core.getBoundingClientRect().width || Math.min(window.innerWidth, window.innerHeight) * 0.4;
+  const baseRadius = coreSize * 0.515;
+  const maxBarLength = coreSize * 1.38;
+  const barWidth = Math.max(1.25, (Math.PI * 2 * baseRadius) / bars * 0.42);
+  const deadZone = 1 / Math.max(1, maxBarLength);
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(performance.now() / 9000);
-  for (let i = 0; i < bars; i += 1) {
-    const sourceIndex = freqData && !audio.paused ? Math.floor((i / bars) * Math.min(freqData.length, 256)) : -1;
-    const amplitude = sourceIndex >= 0 ? Math.max(0, freqData[sourceIndex] / 255 - 0.02) : 0;
-    if (amplitude <= 0.006 && energy < 0.05) continue;
-    const angle = (i / bars) * Math.PI * 2;
-    const length = 3 + amplitude * 46 + energy * 7;
-    const r1 = baseRadius + 18;
-    const r2 = r1 + length;
-    ctx.strokeStyle = `rgba(255,255,255,${0.07 + amplitude * 0.34})`;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
-    ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
-    ctx.stroke();
+  ctx.rotate(performance.now() / 14000);
+  ctx.lineCap = 'butt';
+  for (let round = 0; round < visualiserRounds; round += 1) {
+    const roundOffset = (round * Math.PI * 2) / visualiserRounds;
+    for (let i = 0; i < bars; i += 1) {
+      const amplitude = visualizerBars[i];
+      if (amplitude <= deadZone && energy < 0.04) continue;
+      const angle = (i / bars) * Math.PI * 2 + roundOffset;
+      const length = Math.max(1.5, amplitude * maxBarLength + energy * 5);
+      const r1 = baseRadius + 7;
+      const r2 = r1 + length;
+      const alpha = Math.min(0.56, 0.045 + amplitude * 1.4 + energy * 0.06);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = barWidth;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
+      ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
 
 window.addEventListener('resize', resize);
-window.addEventListener('pointermove', () => touch(), { passive: true });
+window.addEventListener('pointermove', (event) => {
+  pointerX = event.clientX;
+  pointerY = event.clientY;
+  touch();
+}, { passive: true });
 window.addEventListener('keydown', () => touch());
 core.addEventListener('click', () => setPanel(app.dataset.panel === 'controls' ? 'idle' : 'controls'));
+core.addEventListener('pointerenter', () => {
+  coreHover = true;
+});
+core.addEventListener('pointerleave', () => {
+  coreHover = false;
+});
 core.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
   event.preventDefault();
@@ -777,12 +1031,15 @@ document.addEventListener('visual-transport', (event) => {
 });
 scanPanel.addEventListener('pointerdown', () => touch('scan'));
 songPanel.addEventListener('pointerdown', () => touch('songs'));
+settingsPanel.addEventListener('pointerdown', () => touch('settings'));
 
 document.querySelector('#open-scan').addEventListener('click', () => setPanel('scan'));
 document.querySelector('#open-library').addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
+document.querySelector('#open-settings').addEventListener('click', () => setPanel('settings'));
 minimizeControls.addEventListener('click', () => setPanel('idle'));
 document.querySelector('#close-scan').addEventListener('click', () => setPanel('controls'));
 document.querySelector('#close-library').addEventListener('click', () => setPanel('controls'));
+document.querySelector('#close-settings').addEventListener('click', () => setPanel('controls'));
 document.querySelector('#detect-osu').addEventListener('click', detectOsu);
 document.querySelector('#scan-osu').addEventListener('click', () => scan('osu'));
 document.querySelector('#scan-music').addEventListener('click', () => scan('music'));
@@ -823,6 +1080,7 @@ audio.addEventListener('pause', () => {
   miniState.textContent = activeIndex === -1 ? '就绪' : '已暂停';
 });
 
+loadSettings();
 resize();
 draw();
 detectOsu();

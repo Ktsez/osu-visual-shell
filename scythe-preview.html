@@ -7,8 +7,10 @@
     <link rel="stylesheet" href="/src/style.css" />
     <style>
       :root {
-        --flash-left: 0.9;
-        --flash-right: 0.56;
+        --left-soft: 0.62;
+        --right-soft: 0.42;
+        --left-hard: 0.9;
+        --right-hard: 0.18;
         --light: 0.74;
         --sweep: 0.82;
         --left: 0.5;
@@ -33,14 +35,12 @@
     <main id="app" class="app" data-panel="idle">
       <section class="visual" aria-label="side light preview">
         <div class="scythe scythe-left" aria-hidden="true">
-          <span class="side-slice side-slice-wash"></span>
-          <span class="side-slice side-slice-body"></span>
-          <span class="side-slice side-slice-hot"></span>
+          <span class="side-glow side-glow-soft"></span>
+          <span class="side-glow side-glow-hard"></span>
         </div>
         <div class="scythe scythe-right" aria-hidden="true">
-          <span class="side-slice side-slice-wash"></span>
-          <span class="side-slice side-slice-body"></span>
-          <span class="side-slice side-slice-hot"></span>
+          <span class="side-glow side-glow-soft"></span>
+          <span class="side-glow side-glow-hard"></span>
         </div>
       </section>
     </main>

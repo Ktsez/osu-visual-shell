@@ -7,6 +7,11 @@
   --sweep: 0;
   --flash-left: 0;
   --flash-right: 0;
+  --left-soft: 0;
+  --right-soft: 0;
+  --left-hard: 0;
+  --right-hard: 0;
+  --core-flash: 0;
   color: #fff;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -45,7 +50,7 @@ button {
 }
 
 button:hover,
-.transport [role="button"]:hover {
+.transport button:hover {
   background: rgba(255, 255, 255, 0.18);
   transform: translateY(-1px);
 }
@@ -95,10 +100,9 @@ button:hover,
   position: fixed;
   top: 50%;
   left: 50%;
-  width: min(36vw, 380px);
-  min-width: 250px;
+  width: clamp(320px, 44vmin, 520px);
   aspect-ratio: 1;
-  border: 5px solid rgba(255, 255, 255, 0.88);
+  border: clamp(5px, 0.75vmin, 8px) solid rgba(255, 255, 255, calc(0.84 + var(--core-flash) * 0.16));
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -107,12 +111,14 @@ button:hover,
     radial-gradient(circle at 39% 33%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.22) 11%, transparent 12%),
     radial-gradient(circle at 50% 54%, #ff82c9 0%, #f0419d 38%, #b61f72 67%, #43123d 100%);
   text-transform: lowercase;
-  box-shadow: 0 0 64px rgba(255, 75, 172, 0.38);
+  box-shadow:
+    0 0 calc(54px + var(--core-flash) * 60px) rgba(255, 75, 172, calc(0.34 + var(--core-flash) * 0.26)),
+    inset 0 0 calc(18px + var(--core-flash) * 28px) rgba(255, 255, 255, calc(0.08 + var(--core-flash) * 0.18));
   transition:
     width 520ms cubic-bezier(0.16, 1.16, 0.22, 1),
-    min-width 520ms cubic-bezier(0.16, 1.16, 0.22, 1),
     border-width 420ms cubic-bezier(0.16, 1, 0.24, 1),
     opacity 260ms ease;
+  will-change: transform, box-shadow;
 }
 
 .core-cover {
@@ -130,7 +136,8 @@ button:hover,
 
 .app[data-panel="controls"] .core,
 .app[data-panel="scan"] .core,
-.app[data-panel="songs"] .core {
+.app[data-panel="songs"] .core,
+.app[data-panel="settings"] .core {
   pointer-events: none;
 }
 
@@ -138,7 +145,7 @@ button:hover,
   content: "";
   position: absolute;
   inset: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.36);
+  border: 2px solid rgba(255, 255, 255, calc(0.32 + var(--core-flash) * 0.22));
   border-radius: inherit;
 }
 
@@ -148,15 +155,6 @@ button:hover,
   inset: 34px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: inherit;
-}
-
-.core-spin {
-  position: absolute;
-  inset: -28px;
-  border-radius: inherit;
-  background: conic-gradient(from 0deg, transparent, rgba(255, 255, 255, 0.44), transparent 28%, rgba(255, 127, 211, 0.52), transparent 68%);
-  opacity: calc(0.3 + var(--energy) * 0.48);
-  animation: rotate 13s linear infinite;
 }
 
 .core-subtitle {
@@ -183,17 +181,19 @@ button:hover,
 .app[data-panel="controls"] .core-subtitle,
 .app[data-panel="scan"] .core-subtitle,
 .app[data-panel="songs"] .core-subtitle,
+.app[data-panel="settings"] .core-subtitle,
 .app[data-panel="controls"] .core-mini,
 .app[data-panel="scan"] .core-mini,
-.app[data-panel="songs"] .core-mini {
+.app[data-panel="songs"] .core-mini,
+.app[data-panel="settings"] .core-mini {
   opacity: 0.24;
 }
 
 .app[data-panel="controls"] .core,
 .app[data-panel="scan"] .core,
-.app[data-panel="songs"] .core {
-  width: min(43vw, 440px);
-  min-width: 330px;
+.app[data-panel="songs"] .core,
+.app[data-panel="settings"] .core {
+  width: clamp(340px, 48vmin, 540px);
   border-width: 4px;
 }
 
@@ -315,7 +315,7 @@ button:hover,
   grid-template-columns: 1fr 1.2fr 1fr;
 }
 
-.transport [role="button"] {
+.transport button {
   min-height: 42px;
   display: grid;
   place-items: center;
@@ -330,7 +330,7 @@ button:hover,
 }
 
 .orbit-actions {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   margin-top: 8px;
 }
 
@@ -384,7 +384,8 @@ button:hover,
   transform: translate(-12%, -50%) scale(0.94);
 }
 
-.song-panel {
+.song-panel,
+.settings-panel {
   right: 28px;
   width: min(460px, 40vw);
   transform: translate(12%, -50%) scale(0.94) skewX(-2deg);
@@ -400,6 +401,26 @@ button:hover,
   opacity: 1;
   pointer-events: auto;
   transform: translate(0, -50%) scale(1);
+}
+
+.settings-panel {
+  left: 28px;
+  right: auto;
+  width: min(390px, 88vw);
+}
+
+.settings-panel label + label {
+  margin-top: 12px;
+}
+
+.settings-panel input[type="range"] {
+  accent-color: #fff;
+}
+
+.app[data-panel="settings"] .settings-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, -50%) scale(1) skewX(-2deg);
 }
 
 .panel-title {
@@ -497,78 +518,78 @@ input {
 
 .scythe {
   position: fixed;
-  top: 50%;
-  --scythe-width: clamp(320px, 44vmin, 680px);
-  --scythe-height: 150vh;
-  --scythe-offset: calc(var(--scythe-width) * -0.7);
+  top: -12vh;
+  bottom: -12vh;
+  --scythe-width: clamp(250px, 36vw, 680px);
   width: var(--scythe-width);
-  height: var(--scythe-height);
   pointer-events: none;
-  opacity: 0;
-  filter: drop-shadow(0 0 calc(8px + var(--light) * 28px) rgba(255, 255, 255, 0.5));
+  opacity: 1;
+  filter: blur(0.2px) drop-shadow(0 0 calc(14px + var(--light) * 38px) rgba(255, 255, 255, 0.58));
   mix-blend-mode: screen;
-  transition: opacity 110ms ease-out, transform 140ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms ease-out;
+  transition: filter 180ms ease-out;
   will-change: opacity, transform, filter;
+  overflow: visible;
 }
 
 .scythe-left {
-  left: var(--scythe-offset);
-  opacity: var(--flash-left);
-  transform: translateY(-50%) translateX(calc(-14px + var(--flash-left) * 24px)) scaleX(1.02);
+  left: 0;
+  transform: translateX(calc(-28px + var(--left-hard) * 18px + var(--left-soft) * 8px));
 }
 
 .scythe-right {
-  right: var(--scythe-offset);
-  opacity: var(--flash-right);
-  transform: translateY(-50%) translateX(calc(14px - var(--flash-right) * 24px)) scaleX(-1.02);
+  right: 0;
+  transform: scaleX(-1) translateX(calc(-28px + var(--right-hard) * 18px + var(--right-soft) * 8px));
 }
 
-.side-slice {
+.side-glow {
   position: absolute;
   inset: 0;
-  border-radius: 42% 100% 100% 42% / 50%;
-  clip-path: ellipse(38% 48% at 100% 50%);
-  background:
-    radial-gradient(ellipse at 100% 50%,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(255, 255, 255, 0.82) 12%,
-      rgba(255, 255, 255, 0.46) 26%,
-      rgba(255, 255, 255, 0.14) 43%,
-      transparent 66%),
-    linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.05) 42%, rgba(255, 255, 255, 0.5) 100%);
-  transform-origin: 100% 50%;
+  transform-origin: 0 50%;
   will-change: opacity, transform, filter;
 }
 
-.side-slice-wash {
-  inset: 0 -8% 0 10%;
-  clip-path: ellipse(44% 50% at 100% 50%);
-  opacity: calc(0.14 + var(--light) * 0.12);
-  filter: blur(calc(22px + var(--light) * 20px));
-  transform: scaleX(calc(1.02 + var(--sweep) * 0.02)) scaleY(1.02);
-}
-
-.side-slice-body {
-  inset: 9% 2% 9% 22%;
-  clip-path: ellipse(38% 47% at 100% 50%);
-  opacity: calc(0.66 + var(--light) * 0.2);
-  filter: blur(3px);
-  transform: scaleX(calc(0.96 + var(--sweep) * 0.018));
-}
-
-.side-slice-hot {
-  inset: 20% 6% 20% 48%;
-  clip-path: ellipse(28% 43% at 100% 50%);
-  opacity: calc(0.72 + var(--light) * 0.18);
-  filter: blur(1.2px);
+.side-glow-soft {
+  opacity: calc(var(--left-soft, 0) * 0.58);
   background:
-    radial-gradient(ellipse at 100% 50%,
-      rgba(255, 255, 255, 1) 0%,
-      rgba(255, 255, 255, 0.9) 11%,
-      rgba(255, 255, 255, 0.4) 27%,
+    radial-gradient(ellipse 88% 96% at -8% 50%,
+      rgba(255, 255, 255, 0.62) 0%,
+      rgba(255, 255, 255, 0.36) 22%,
+      rgba(255, 255, 255, 0.12) 48%,
+      transparent 76%),
+    linear-gradient(90deg,
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(255, 255, 255, 0.18) 22%,
+      rgba(255, 255, 255, 0.045) 58%,
+      transparent 100%);
+  filter: blur(22px);
+  transform: scaleX(calc(0.88 + var(--left-soft, 0) * 0.26));
+}
+
+.side-glow-hard {
+  opacity: calc(var(--left-hard, 0) * 0.82);
+  background:
+    radial-gradient(ellipse 62% 118% at -5% 50%,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(255, 255, 255, 0.56) 18%,
+      rgba(255, 255, 255, 0.18) 42%,
+      transparent 72%),
+    linear-gradient(90deg,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.3) 18%,
       rgba(255, 255, 255, 0.08) 44%,
-      transparent 61%);
-  transform: scaleX(calc(0.9 + var(--sweep) * 0.034));
+      transparent 84%);
+  filter: blur(8px);
+  transform: scaleX(calc(0.72 + var(--left-hard, 0) * 0.38));
+}
+
+.scythe-right .side-glow-soft {
+  opacity: calc(var(--right-soft, 0) * 0.58);
+  transform: scaleX(calc(0.88 + var(--right-soft, 0) * 0.26));
+}
+
+.scythe-right .side-glow-hard {
+  opacity: calc(var(--right-hard, 0) * 0.82);
+  transform: scaleX(calc(0.72 + var(--right-hard, 0) * 0.38));
 }
 
 .app:not([data-panel="idle"]) .scythe {
@@ -582,7 +603,7 @@ input {
 }
 
 .is-idle .core {
-  width: min(38vw, 400px);
+  width: clamp(330px, 46vmin, 540px);
 }
 
 audio {
@@ -610,11 +631,12 @@ audio {
 
 @media (max-width: 980px) {
   .core {
-    width: min(68vw, 340px);
+    width: clamp(300px, 78vw, 390px);
   }
 
   .scan-panel,
-  .song-panel {
+  .song-panel,
+  .settings-panel {
     top: auto;
     left: 50%;
     right: auto;
@@ -623,29 +645,24 @@ audio {
   }
 
   .app[data-panel="scan"] .scan-panel,
-  .app[data-panel="songs"] .song-panel {
+  .app[data-panel="songs"] .song-panel,
+  .app[data-panel="settings"] .settings-panel {
     transform: translate(-50%, 0) scale(1);
   }
 
   .scythe {
-    --scythe-width: clamp(280px, 62vw, 420px);
-    --scythe-height: 150vh;
-    --scythe-offset: calc(var(--scythe-width) * -0.64);
+    --scythe-width: clamp(210px, 55vw, 430px);
   }
 }
 
 @media (min-aspect-ratio: 16 / 9) {
   .scythe {
-    --scythe-width: clamp(340px, 52vh, 660px);
-    --scythe-height: 150vh;
-    --scythe-offset: calc(var(--scythe-width) * -0.72);
+    --scythe-width: clamp(280px, 46vh, 720px);
   }
 }
 
 @media (max-width: 520px) {
   .scythe {
-    --scythe-width: clamp(260px, 70vw, 340px);
-    --scythe-height: 150vh;
-    --scythe-offset: calc(var(--scythe-width) * -0.6);
+    --scythe-width: clamp(170px, 58vw, 300px);
   }
 }

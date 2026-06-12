@@ -14,21 +14,18 @@
     <main id="app" class="app" data-panel="idle">
       <section class="visual" aria-label="视觉播放器">
         <div class="scythe scythe-left" aria-hidden="true">
-          <span class="side-slice side-slice-wash"></span>
-          <span class="side-slice side-slice-body"></span>
-          <span class="side-slice side-slice-hot"></span>
+          <span class="side-glow side-glow-soft"></span>
+          <span class="side-glow side-glow-hard"></span>
         </div>
         <div class="scythe scythe-right" aria-hidden="true">
-          <span class="side-slice side-slice-wash"></span>
-          <span class="side-slice side-slice-body"></span>
-          <span class="side-slice side-slice-hot"></span>
+          <span class="side-glow side-glow-soft"></span>
+          <span class="side-glow side-glow-hard"></span>
         </div>
 
         <div class="halo halo-a"></div>
         <div class="halo halo-b"></div>
 
         <div id="core" class="core" role="button" tabindex="0" aria-label="打开音乐控制">
-          <span class="core-spin"></span>
           <span id="core-cover" class="core-cover"></span>
           <span id="core-subtitle" class="core-subtitle">点击打开</span>
           <span class="core-mini">
@@ -57,14 +54,15 @@
           </div>
 
           <div class="transport">
-            <div id="prev" role="button" tabindex="0" onpointerdown="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'prev' }))" onclick="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'prev' }))">上一首</div>
-            <div id="toggle-play" role="button" tabindex="0" onpointerdown="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'toggle-play' }))" onclick="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'toggle-play' }))">播放</div>
-            <div id="next" role="button" tabindex="0" onpointerdown="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'next' }))" onclick="document.dispatchEvent(new CustomEvent('visual-transport', { detail: 'next' }))">下一首</div>
+            <button id="prev" type="button">上一首</button>
+            <button id="toggle-play" type="button">播放</button>
+            <button id="next" type="button">下一首</button>
           </div>
 
           <div class="orbit-actions">
             <button id="open-scan" type="button">扫描</button>
             <button id="open-library" type="button">歌曲列表</button>
+            <button id="open-settings" type="button">设置</button>
           </div>
 
           <p id="status" class="status">就绪。可以检测本地 osu! Songs。</p>
@@ -94,10 +92,37 @@
           <input id="search" class="search" placeholder="筛选歌曲" />
           <div id="list" class="track-list" aria-label="歌曲列表"></div>
         </section>
+
+        <section id="settings-panel" class="float-panel settings-panel wedge-panel" aria-label="视觉设置">
+          <div class="panel-title">
+            <p>视觉设置</p>
+            <button id="close-settings" type="button">关闭</button>
+          </div>
+          <label>
+            <span>侧灯强度</span>
+            <input id="setting-side-intensity" type="range" min="0.4" max="1.8" step="0.05" value="1" />
+          </label>
+          <label>
+            <span>侧灯克制</span>
+            <input id="setting-side-restraint" type="range" min="0" max="1" step="0.05" value="0.55" />
+          </label>
+          <label>
+            <span>圆盘律动</span>
+            <input id="setting-pulse" type="range" min="0.5" max="1.8" step="0.05" value="1" />
+          </label>
+          <label>
+            <span>能量柱长度</span>
+            <input id="setting-visualizer" type="range" min="0.5" max="1.8" step="0.05" value="1" />
+          </label>
+          <label>
+            <span>星星喷泉</span>
+            <input id="setting-fountain" type="range" min="0" max="1.6" step="0.05" value="1" />
+          </label>
+        </section>
       </section>
     </main>
 
     <audio id="audio" crossorigin="anonymous"></audio>
-    <script type="module" src="/src/main.js?v=20260612-side-light-stage-fill"></script>
+    <script type="module" src="/src/main.js?v=20260612-lightfield-logo-fountain"></script>
   </body>
 </html>
