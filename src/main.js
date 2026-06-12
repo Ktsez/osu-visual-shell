@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260612-wave-visualizer-settings';
+window.__appVersion = '20260612-lazer-visualizer-pass';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -112,6 +112,7 @@ let coreFollowY = 0;
 let coreFlash = 0;
 let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
+let lastAudioFountainAt = -10000;
 
 const visualizerBars = new Float32Array(200);
 const defaultSettings = {
@@ -121,7 +122,7 @@ const defaultSettings = {
   visualizer: 1,
   visualizerRange: 3,
   visualizerDecay: 1,
-  waveSize: 2,
+  waveSize: 1,
   waveIntensity: 1,
   fountain: 1,
   fountainSensitivity: 1.25,
@@ -377,8 +378,9 @@ async function playIndex(index) {
   starParticles = [];
   fountainBursts = [];
   rippleRings = [];
-  lastKiaiState = Boolean(activeEffectPoint?.kiai);
+  lastKiaiState = false;
   lastFountainAt = -10000;
+  lastAudioFountainAt = -10000;
   lastRippleAt = -10000;
   visualizerBars.fill(0);
   markActiveTrack();
@@ -514,7 +516,7 @@ function updateTiming() {
   activeEffectPoint = effectPoint;
 
   const kiaiNow = Boolean(effectPoint?.kiai);
-  if (kiaiNow && !lastKiaiState && Math.abs(syncMs - effectPoint.offset) < 1100) {
+  if (kiaiNow && !lastKiaiState && Math.abs(syncMs - effectPoint.offset) < 500) {
     maybeTriggerStarFountain(1.05, 'kiai-start');
     coreFlash = Math.max(coreFlash, 0.72);
   }
@@ -544,9 +546,7 @@ function updateTiming() {
     beatWindow = 1;
     coreFlash = Math.max(coreFlash, 0.58);
     spawnRipple(0.7 + amplitudeAdjust * 0.45, 'downbeat');
-    if (kiaiNow || currentDrive > driveAverage + 0.08 || currentRise > Math.max(0.06, riseAverage * 2.4)) {
-      maybeTriggerStarFountain(kiaiNow ? 0.8 : 0.55, 'strong-downbeat');
-    }
+    maybeTriggerStarFountain(kiaiNow ? 0.52 : 0.42, 'audio-fallback');
   } else {
     beatAccent = Math.max(beatAccent, 0.42);
     beatWindow = Math.max(beatWindow, 0.55);
@@ -736,35 +736,47 @@ function updateAudioEnergy() {
     logoPulse = Math.max(logoPulse, Math.min(1.2, low * 1.3));
   }
 
+  const track = tracks[activeIndex];
+  const hasTiming = Boolean(track?.timingPoints?.length);
+  if (!hasTiming && positiveRise > Math.max(0.065, riseAverage * 2.3) && drive > Math.max(0.24, driveAverage + 0.08)) {
+    spawnRipple(0.5 + Math.min(0.5, drive), 'audio-fallback');
+    maybeTriggerStarFountain(0.46, 'audio-fallback');
+  }
+
   lastLow = low;
   lastMid = mid;
   lastDrive = drive;
 }
 
 function updateLogoAmplitudes(now, elapsed) {
-  const decayFactor = elapsed * 0.00058 * settings.visualizerDecay;
+  const decayFactor = elapsed * 0.0024 * settings.visualizerDecay;
   for (let i = 0; i < visualizerBars.length; i += 1) {
     visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
   }
 
-  if (!freqData || audio.paused || now - lastVisualizerUpdate < 85) return;
+  if (!freqData || audio.paused || now - lastVisualizerUpdate < 50) return;
   lastVisualizerUpdate = now;
 
-  const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.62;
-  const dynamicRange = 0.16 + Math.max(0.04, amplitudeAverage) * 1.55;
-  const userScale = 0.2 + settings.visualizer * 0.42;
+  const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
+  const dynamicRange = 0.07 + Math.max(0.035, amplitudeAverage) * 0.9;
+  const userScale = 0.72 + settings.visualizer * 0.36;
+  const noiseFloor = Math.max(0.026, amplitudeAverage * 0.2);
   for (let i = 0; i < visualizerBars.length; i += 1) {
     const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
     const raw = (freqData[sourceIndex] || 0) / 255;
-    const normalised = Math.max(0, raw - 0.018) / dynamicRange;
-    const compressed = 1 - Math.exp(-normalised * 0.72);
-    const target = Math.min(0.42, compressed * 0.32 * kiaiMultiplier * userScale);
+    const prev = (freqData[(sourceIndex + freqData.length - 2) % freqData.length] || 0) / 255;
+    const next = (freqData[(sourceIndex + 2) % freqData.length] || 0) / 255;
+    const localAverage = (prev + next) * 0.5;
+    const peak = Math.max(0, raw - localAverage * 0.52 - noiseFloor);
+    const normalised = peak / dynamicRange;
+    const compressed = Math.pow(Math.min(1, normalised), 0.72);
+    const target = Math.min(0.34, compressed * 0.34 * kiaiMultiplier * userScale);
     if (target > visualizerBars[i]) {
-      visualizerBars[i] += (target - visualizerBars[i]) * 0.42;
+      visualizerBars[i] = target;
     }
   }
-  visualizerOffset = (visualizerOffset + 3) % visualizerBars.length;
+  visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
 }
 
 function spawnBurst(count = 10) {
@@ -802,23 +814,32 @@ function spawnRipple(power = 0.6, reason = 'beat') {
 
 function maybeTriggerStarFountain(power = 1, reason = 'kiai') {
   const trackTime = audio.currentTime || 0;
-  const sensitivity = settings.fountainSensitivity || 1;
-  const activeLift = currentDrive > Math.max(0.2, driveAverage + 0.052 / sensitivity);
-  const meaningfulRise = currentRise > Math.max(0.028, riseAverage * (1.55 / sensitivity));
-  const suddenReturn = calmWindow > 0.18 / sensitivity && meaningfulRise && currentDrive > Math.max(0.2, driveAverage + 0.052 / sensitivity);
-  const afterIntro = trackTime >= 10;
-  const earlyException = trackTime >= 6 && calmWindow > 0.58 / sensitivity && suddenReturn && currentDrive > 0.3;
-  const kiaiCut = reason === 'kiai-start' && (suddenReturn || activeLift || meaningfulRise);
-  const strongCut = reason !== 'kiai-start' && (suddenReturn || (activeEffectPoint?.kiai && activeLift) || (meaningfulRise && currentDrive > 0.28));
+  if (reason === 'kiai-start') {
+    triggerStarFountain(power, reason);
+    return;
+  }
 
-  if ((!afterIntro && !earlyException) || (!kiaiCut && !strongCut)) return;
-  triggerStarFountain(power * (suddenReturn ? 1.15 : 0.86), reason);
+  const track = tracks[activeIndex];
+  const hasKiaiMarkers = Boolean(track?.timingPoints?.some((point) => point.kiai));
+  if (hasKiaiMarkers || trackTime < 10) return;
+
+  const now = performance.now();
+  if (now - lastAudioFountainAt < 6500) return;
+
+  const sensitivity = settings.fountainSensitivity || 1;
+  const meaningfulRise = currentRise > Math.max(0.042, riseAverage * (1.9 / sensitivity));
+  const suddenReturn = calmWindow > 0.32 / sensitivity && meaningfulRise && currentDrive > Math.max(0.26, driveAverage + 0.08 / sensitivity);
+  const strongLift = currentDrive > Math.max(0.34, driveAverage + 0.16 / sensitivity) && currentRise > Math.max(0.055, riseAverage * 2.1 / sensitivity);
+
+  if (!suddenReturn && !strongLift) return;
+  lastAudioFountainAt = now;
+  triggerStarFountain(power * (suddenReturn ? 1.05 : 0.82), reason);
 }
 
 function triggerStarFountain(power = 1, reason = 'kiai') {
   if (settings.fountain <= 0.02) return;
   const now = performance.now();
-  const cooldown = reason === 'kiai-start' ? 1200 : 1800 - settings.fountain * 320;
+  const cooldown = reason === 'kiai-start' ? 900 : 2200 - settings.fountain * 280;
   if (now - lastFountainAt < cooldown) return;
   lastFountainAt = now;
 
@@ -924,15 +945,15 @@ function drawRippleRings(cx, cy, coreSize, now) {
   ctx.globalCompositeOperation = 'lighter';
   for (const ring of rippleRings) {
     const progress = Math.max(0, Math.min(1, (now - ring.start) / ring.duration));
-    const eased = 1 - Math.pow(1 - progress, 2.35);
-    const maxRadius = Math.max(window.innerWidth, window.innerHeight) * 0.67 * settings.waveSize;
-    const radius = coreSize * 0.18 + eased * maxRadius;
-    const fade = Math.pow(1 - progress, 1.45);
-    const alpha = fade * (0.12 + ring.power * 0.12) * settings.waveIntensity;
-    const gradient = ctx.createRadialGradient(0, 0, Math.max(0, radius * 0.12), 0, 0, radius);
-    gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.42})`);
-    gradient.addColorStop(0.42, `rgba(255, 255, 255, ${alpha * 0.16})`);
-    gradient.addColorStop(0.72, `rgba(255, 255, 255, ${alpha * 0.052})`);
+    const eased = 1 - Math.pow(1 - progress, 2.05);
+    const maxRadius = Math.min(window.innerWidth, window.innerHeight) * 0.67 * settings.waveSize;
+    const radius = coreSize * 0.46 + eased * maxRadius;
+    const fade = Math.pow(1 - progress, 1.18);
+    const alpha = fade * (0.24 + ring.power * 0.2) * settings.waveIntensity;
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+    gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.5})`);
+    gradient.addColorStop(0.28, `rgba(255, 255, 255, ${alpha * 0.26})`);
+    gradient.addColorStop(0.62, `rgba(255, 255, 255, ${alpha * 0.075})`);
     gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -1102,35 +1123,31 @@ function drawLogoVisualizer(cx, cy, energy) {
   const baseRadius = coreSize * 0.472;
   const maxBarLength = coreSize * 0.58 * settings.visualizerRange;
   const barWidth = Math.max(5.2, (Math.PI * 2 * coreSize * 0.5) / bars * 0.86);
-  const deadZone = 1 / Math.max(1, maxBarLength);
+  const deadZone = Math.max(0.0075, 1 / Math.max(1, maxBarLength));
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.lineCap = 'round';
-
-  const drawLayer = (angleOffset, alphaScale, lengthScale, widthScale, colour) => {
-    for (let round = 0; round < visualiserRounds; round += 1) {
-      const roundOffset = angleOffset + (round * Math.PI * 2) / visualiserRounds;
-      for (let i = 0; i < bars; i += 1) {
-        const amplitude = visualizerBars[i];
-        if (amplitude <= deadZone && energy < 0.04) continue;
-        const angle = (i / bars) * Math.PI * 2 + roundOffset;
-        const length = Math.max(4, amplitude * maxBarLength * lengthScale + Math.min(7, energy * 4));
-        const r1 = baseRadius;
-        const r2 = r1 + length;
-        const alpha = Math.min(0.38, (0.032 + amplitude * 0.8 + energy * 0.03) * alphaScale);
-        ctx.strokeStyle = colour(alpha);
-        ctx.lineWidth = barWidth * widthScale;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
-        ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
-        ctx.stroke();
-      }
-    }
-  };
-
+  ctx.lineCap = 'butt';
+  ctx.globalCompositeOperation = 'lighter';
   ctx.rotate(performance.now() / 27000);
-  drawLayer(0, 0.42, 1.04, 1.45, (alpha) => `rgba(255, 255, 255, ${alpha})`);
-  drawLayer(Math.PI / 2, 0.78, 0.88, 0.95, (alpha) => `rgba(255, 255, 255, ${alpha})`);
+
+  for (let round = 0; round < visualiserRounds; round += 1) {
+    const roundOffset = (round * Math.PI * 2) / visualiserRounds;
+    for (let i = 0; i < bars; i += 1) {
+      const amplitude = visualizerBars[i];
+      if (amplitude <= deadZone) continue;
+      const angle = (i / bars) * Math.PI * 2 + roundOffset;
+      const length = amplitude * maxBarLength;
+      const r1 = baseRadius;
+      const r2 = r1 + length;
+      const alpha = Math.min(0.28, 0.05 + amplitude * 0.62);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.lineWidth = barWidth;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
+      ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
+      ctx.stroke();
+    }
+  }
 
   ctx.restore();
 }
