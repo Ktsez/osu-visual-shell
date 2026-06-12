@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260612-lazer-visualizer-pass';
+window.__appVersion = '20260613-settings-visualizer-tune';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -27,18 +27,8 @@ const trackMeta = document.querySelector('#track-meta');
 const cover = document.querySelector('#cover');
 const songCount = document.querySelector('#song-count');
 const minimizeControls = document.querySelector('#minimize-controls');
-const settingsInputs = {
-  sideIntensity: document.querySelector('#setting-side-intensity'),
-  sideRestraint: document.querySelector('#setting-side-restraint'),
-  pulse: document.querySelector('#setting-pulse'),
-  visualizer: document.querySelector('#setting-visualizer'),
-  visualizerRange: document.querySelector('#setting-visualizer-range'),
-  visualizerDecay: document.querySelector('#setting-visualizer-decay'),
-  waveSize: document.querySelector('#setting-wave-size'),
-  waveIntensity: document.querySelector('#setting-wave-intensity'),
-  fountain: document.querySelector('#setting-fountain'),
-  fountainSensitivity: document.querySelector('#setting-fountain-sensitivity'),
-};
+const settingsInputs = Object.fromEntries([...document.querySelectorAll('[data-setting]')].map((input) => [input.dataset.setting, input]));
+const settingsNumberInputs = Object.fromEntries([...document.querySelectorAll('[data-setting-number]')].map((input) => [input.dataset.settingNumber, input]));
 const resetSettingsButton = document.querySelector('#reset-settings');
 
 let tracks = [];
@@ -121,6 +111,7 @@ const defaultSettings = {
   pulse: 1,
   visualizer: 1,
   visualizerRange: 3,
+  visualizerContrast: 1.35,
   visualizerDecay: 1,
   waveSize: 1,
   waveIntensity: 1,
@@ -132,7 +123,7 @@ const settings = { ...defaultSettings };
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v1';
+const settingsKey = 'osu-visual-shell-settings-v2';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -157,6 +148,36 @@ function setPanel(panel) {
   touch(panel);
 }
 
+function clampSettingValue(key, value) {
+  const rangeInput = settingsInputs[key];
+  const numberInput = settingsNumberInputs[key];
+  const min = Number(rangeInput?.min ?? numberInput?.min ?? Number.NEGATIVE_INFINITY);
+  const max = Number(rangeInput?.max ?? numberInput?.max ?? Number.POSITIVE_INFINITY);
+  const fallback = defaultSettings[key] ?? 1;
+  const numeric = Number.isFinite(Number(value)) ? Number(value) : fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function formatSettingValue(value) {
+  return Number(value).toFixed(1);
+}
+
+function writeSettingInputs(key, options = {}) {
+  const value = clampSettingValue(key, settings[key]);
+  settings[key] = value;
+  if (settingsInputs[key]) settingsInputs[key].value = String(value);
+  if (settingsNumberInputs[key]) {
+    settingsNumberInputs[key].value = options.preserveNumberInput ? String(value) : formatSettingValue(value);
+  }
+}
+
+function persistSetting(key, value, options = {}) {
+  settings[key] = clampSettingValue(key, value);
+  writeSettingInputs(key, options);
+  localStorage.setItem(settingsKey, JSON.stringify(settings));
+  touch('settings');
+}
+
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(settingsKey) || '{}');
@@ -167,20 +188,21 @@ function loadSettings() {
 
   for (const [key, input] of Object.entries(settingsInputs)) {
     if (!input) continue;
-    input.value = String(settings[key]);
-    input.addEventListener('input', () => {
-      settings[key] = Number(input.value);
-      localStorage.setItem(settingsKey, JSON.stringify(settings));
-      touch('settings');
-    });
+    writeSettingInputs(key);
+    input.addEventListener('input', () => persistSetting(key, input.value));
+  }
+
+  for (const [key, input] of Object.entries(settingsNumberInputs)) {
+    if (!input) continue;
+    writeSettingInputs(key);
+    input.addEventListener('input', () => persistSetting(key, input.value, { preserveNumberInput: true }));
+    input.addEventListener('change', () => persistSetting(key, input.value));
   }
 
   resetSettingsButton?.addEventListener('click', () => {
     Object.assign(settings, defaultSettings);
     localStorage.setItem(settingsKey, JSON.stringify(settings));
-    for (const [key, input] of Object.entries(settingsInputs)) {
-      if (input) input.value = String(settings[key]);
-    }
+    Object.keys(defaultSettings).forEach(writeSettingInputs);
     touch('settings');
   });
 }
@@ -762,6 +784,9 @@ function updateLogoAmplitudes(now, elapsed) {
   const dynamicRange = 0.07 + Math.max(0.035, amplitudeAverage) * 0.9;
   const userScale = 0.72 + settings.visualizer * 0.36;
   const noiseFloor = Math.max(0.026, amplitudeAverage * 0.2);
+  const contrast = settings.visualizerContrast || 1.35;
+  const startupLimiter = Math.min(1, Math.max(0.18, (audio.currentTime || 0) / 2.8));
+  const attackLimit = (0.018 + Math.min(0.052, audioAmplitude * 0.07)) * (activeEffectPoint?.kiai ? 1.22 : 1);
   for (let i = 0; i < visualizerBars.length; i += 1) {
     const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
     const raw = (freqData[sourceIndex] || 0) / 255;
@@ -770,10 +795,11 @@ function updateLogoAmplitudes(now, elapsed) {
     const localAverage = (prev + next) * 0.5;
     const peak = Math.max(0, raw - localAverage * 0.52 - noiseFloor);
     const normalised = peak / dynamicRange;
-    const compressed = Math.pow(Math.min(1, normalised), 0.72);
-    const target = Math.min(0.34, compressed * 0.34 * kiaiMultiplier * userScale);
+    const compressed = Math.min(1, normalised);
+    const shaped = Math.pow(compressed, contrast);
+    const target = Math.min(0.5, shaped * (0.36 + contrast * 0.08) * kiaiMultiplier * userScale * startupLimiter);
     if (target > visualizerBars[i]) {
-      visualizerBars[i] = target;
+      visualizerBars[i] = Math.min(target, visualizerBars[i] + attackLimit);
     }
   }
   visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
@@ -948,12 +974,13 @@ function drawRippleRings(cx, cy, coreSize, now) {
     const eased = 1 - Math.pow(1 - progress, 2.05);
     const maxRadius = Math.min(window.innerWidth, window.innerHeight) * 0.67 * settings.waveSize;
     const radius = coreSize * 0.46 + eased * maxRadius;
-    const fade = Math.pow(1 - progress, 1.18);
-    const alpha = fade * (0.24 + ring.power * 0.2) * settings.waveIntensity;
+    const fade = Math.pow(1 - progress, 1.06);
+    const alpha = fade * (0.34 + ring.power * 0.28) * settings.waveIntensity;
     const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-    gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.5})`);
-    gradient.addColorStop(0.28, `rgba(255, 255, 255, ${alpha * 0.26})`);
-    gradient.addColorStop(0.62, `rgba(255, 255, 255, ${alpha * 0.075})`);
+    gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.74})`);
+    gradient.addColorStop(0.24, `rgba(255, 255, 255, ${alpha * 0.36})`);
+    gradient.addColorStop(0.58, `rgba(255, 255, 255, ${alpha * 0.13})`);
+    gradient.addColorStop(0.82, `rgba(255, 255, 255, ${alpha * 0.035})`);
     gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
     ctx.fillStyle = gradient;
     ctx.beginPath();

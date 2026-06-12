@@ -452,8 +452,33 @@ button:hover,
   margin-top: 12px;
 }
 
+.setting-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 68px;
+  gap: 10px;
+  align-items: center;
+}
+
 .settings-panel input[type="range"] {
+  width: 100%;
   accent-color: #fff;
+}
+
+.setting-number {
+  width: 68px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.setting-number:focus {
+  outline: 1px solid rgba(255, 255, 255, 0.55);
 }
 
 .reset-settings {
