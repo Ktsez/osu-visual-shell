@@ -445,6 +445,7 @@ button:hover,
   left: 28px;
   right: auto;
   width: min(390px, 88vw);
+  overflow: auto;
 }
 
 .settings-panel label + label {
@@ -453,6 +454,12 @@ button:hover,
 
 .settings-panel input[type="range"] {
   accent-color: #fff;
+}
+
+.reset-settings {
+  width: 100%;
+  margin-top: 14px;
+  min-height: 40px;
 }
 
 .app[data-panel="settings"] .settings-panel {

@@ -114,17 +114,38 @@
           </label>
           <label>
             <span>能量柱长度</span>
-            <input id="setting-visualizer" type="range" min="0.5" max="1.8" step="0.05" value="1" />
+            <input id="setting-visualizer" type="range" min="0.3" max="2.4" step="0.05" value="1" />
+          </label>
+          <label>
+            <span>能量柱范围</span>
+            <input id="setting-visualizer-range" type="range" min="1" max="4" step="0.05" value="3" />
+          </label>
+          <label>
+            <span>能量柱缓降</span>
+            <input id="setting-visualizer-decay" type="range" min="0.4" max="1.8" step="0.05" value="1" />
+          </label>
+          <label>
+            <span>冲击波大小</span>
+            <input id="setting-wave-size" type="range" min="0.8" max="3" step="0.05" value="2" />
+          </label>
+          <label>
+            <span>冲击波强度</span>
+            <input id="setting-wave-intensity" type="range" min="0" max="2" step="0.05" value="1" />
           </label>
           <label>
             <span>星星喷泉</span>
             <input id="setting-fountain" type="range" min="0" max="1.6" step="0.05" value="1" />
           </label>
+          <label>
+            <span>喷泉灵敏度</span>
+            <input id="setting-fountain-sensitivity" type="range" min="0.4" max="2" step="0.05" value="1.25" />
+          </label>
+          <button id="reset-settings" class="reset-settings" type="button">重置所有参数</button>
         </section>
       </section>
     </main>
 
     <audio id="audio" crossorigin="anonymous"></audio>
-    <script type="module" src="/src/main.js?v=20260612-logo-breath-ripples"></script>
+    <script type="module" src="/src/main.js?v=20260612-wave-visualizer-settings"></script>
   </body>
 </html>
