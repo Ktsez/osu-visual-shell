@@ -39,7 +39,7 @@ button {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.09);
   cursor: pointer;
-  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.18, 1), background 160ms ease, opacity 180ms ease;
+  transition: transform 240ms cubic-bezier(0.2, 0.9, 0.18, 1), background 220ms ease, opacity 240ms ease;
   user-select: none;
   touch-action: manipulation;
 }
@@ -238,7 +238,7 @@ button:hover,
   border-radius: 8px;
   background: rgba(10, 8, 18, 0.72);
   backdrop-filter: blur(16px);
-  transition: transform 440ms cubic-bezier(0.16, 1.14, 0.22, 1), opacity 240ms ease;
+  transition: transform 560ms cubic-bezier(0.16, 1.08, 0.22, 1), opacity 320ms ease;
 }
 
 .app[data-panel="controls"] .control-panel,
@@ -326,7 +326,7 @@ button:hover,
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
-  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.18, 1), background 160ms ease, opacity 180ms ease;
+  transition: transform 240ms cubic-bezier(0.2, 0.9, 0.18, 1), background 220ms ease, opacity 240ms ease;
 }
 
 .orbit-actions {
@@ -364,7 +364,7 @@ button:hover,
   opacity: 0;
   pointer-events: none;
   z-index: 9;
-  transition: transform 360ms cubic-bezier(0.18, 0.9, 0.18, 1), opacity 220ms ease;
+  transition: transform 520ms cubic-bezier(0.18, 0.9, 0.18, 1), opacity 300ms ease;
 }
 
 .wedge-panel::before {
@@ -466,8 +466,8 @@ input {
   clip-path: polygon(4% 0, 100% 0, 96% 100%, 0 100%);
   opacity: 0;
   transform: translateX(36px) skewX(-5deg);
-  animation: trackIn 360ms cubic-bezier(0.16, 1, 0.2, 1) forwards;
-  animation-delay: calc(var(--i) * 18ms);
+  animation: trackIn 520ms cubic-bezier(0.16, 1, 0.2, 1) forwards;
+  animation-delay: calc(var(--i) * 24ms);
 }
 
 .track.active {
@@ -498,95 +498,81 @@ input {
 .scythe {
   position: fixed;
   top: 50%;
-  width: clamp(300px, 39vw, 560px);
-  height: min(94vh, 880px);
+  --scythe-width: clamp(320px, 44vmin, 680px);
+  --scythe-height: clamp(520px, 112vmin, 980px);
+  --scythe-offset: calc(var(--scythe-width) * -0.7);
+  width: var(--scythe-width);
+  height: min(var(--scythe-height), 96vh);
   pointer-events: none;
   opacity: 0;
-  filter: drop-shadow(0 0 calc(12px + var(--light) * 36px) rgba(255, 255, 255, 0.62));
+  filter: drop-shadow(0 0 calc(8px + var(--light) * 28px) rgba(255, 255, 255, 0.5));
   mix-blend-mode: screen;
-  transition: opacity 70ms ease-out, transform 90ms cubic-bezier(0.16, 1, 0.3, 1), filter 140ms ease-out;
+  transition: opacity 110ms ease-out, transform 140ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms ease-out;
   will-change: opacity, transform, filter;
 }
 
 .scythe-left {
-  left: calc(clamp(160px, 26vw, 360px) * -1);
+  left: var(--scythe-offset);
   opacity: var(--flash-left);
-  transform: translateY(-50%) translateX(calc(-18px + var(--flash-left) * 30px)) scaleX(1.02);
+  transform: translateY(-50%) translateX(calc(-14px + var(--flash-left) * 24px)) scaleX(1.02);
 }
 
 .scythe-right {
-  right: calc(clamp(160px, 26vw, 360px) * -1);
+  right: var(--scythe-offset);
   opacity: var(--flash-right);
-  transform: translateY(-50%) translateX(calc(18px - var(--flash-right) * 30px)) scaleX(-1.02);
+  transform: translateY(-50%) translateX(calc(14px - var(--flash-right) * 24px)) scaleX(-1.02);
 }
 
 .side-slice {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
+  border-radius: 46% 100% 100% 46% / 50%;
+  clip-path: ellipse(42% 44% at 100% 50%);
   background:
     radial-gradient(ellipse at 100% 50%,
-      transparent 0 30%,
-      rgba(255, 255, 255, 0.12) 34%,
-      rgba(255, 255, 255, 0.88) 42%,
-      rgba(255, 255, 255, 0.62) 50%,
-      rgba(255, 255, 255, 0.18) 59%,
-      transparent 68%);
-  -webkit-mask:
-    radial-gradient(ellipse at 100% 50%,
-      transparent 0 32%,
-      #000 36% 59%,
-      transparent 66%);
-  mask:
-    radial-gradient(ellipse at 100% 50%,
-      transparent 0 32%,
-      #000 36% 59%,
-      transparent 66%);
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(255, 255, 255, 0.82) 12%,
+      rgba(255, 255, 255, 0.46) 26%,
+      rgba(255, 255, 255, 0.14) 43%,
+      transparent 66%),
+    linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.05) 42%, rgba(255, 255, 255, 0.5) 100%);
   transform-origin: 100% 50%;
   will-change: opacity, transform, filter;
 }
 
 .side-slice-wash {
-  inset: -5% -10% -5% -8%;
-  opacity: calc(0.38 + var(--light) * 0.28);
-  filter: blur(calc(20px + var(--light) * 22px));
-  transform: scaleX(calc(1.05 + var(--sweep) * 0.035)) scaleY(1.03);
+  inset: -4% -8% -4% 4%;
+  clip-path: ellipse(48% 48% at 100% 50%);
+  opacity: calc(0.18 + var(--light) * 0.16);
+  filter: blur(calc(18px + var(--light) * 18px));
+  transform: scaleX(calc(1.02 + var(--sweep) * 0.02)) scaleY(1.02);
 }
 
 .side-slice-body {
-  inset: 1% 1% 1% 4%;
-  opacity: calc(0.58 + var(--light) * 0.3);
+  inset: 5% 2% 5% 18%;
+  clip-path: ellipse(40% 44% at 100% 50%);
+  opacity: calc(0.66 + var(--light) * 0.2);
   filter: blur(3px);
-  transform: scaleX(calc(0.96 + var(--sweep) * 0.025));
+  transform: scaleX(calc(0.96 + var(--sweep) * 0.018));
 }
 
 .side-slice-hot {
-  inset: 7% 4% 7% 20%;
-  opacity: calc(0.74 + var(--light) * 0.22);
-  filter: blur(0.9px);
+  inset: 15% 6% 15% 45%;
+  clip-path: ellipse(30% 39% at 100% 50%);
+  opacity: calc(0.72 + var(--light) * 0.18);
+  filter: blur(1.2px);
   background:
     radial-gradient(ellipse at 100% 50%,
-      transparent 0 38%,
-      rgba(255, 255, 255, 0.24) 40%,
-      rgba(255, 255, 255, 1) 45%,
-      rgba(255, 255, 255, 0.76) 49%,
-      rgba(255, 255, 255, 0.16) 55%,
-      transparent 62%);
-  -webkit-mask:
-    radial-gradient(ellipse at 100% 50%,
-      transparent 0 39%,
-      #000 42% 53%,
-      transparent 60%);
-  mask:
-    radial-gradient(ellipse at 100% 50%,
-      transparent 0 39%,
-      #000 42% 53%,
-      transparent 60%);
-  transform: scaleX(calc(0.92 + var(--sweep) * 0.045));
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.9) 11%,
+      rgba(255, 255, 255, 0.4) 27%,
+      rgba(255, 255, 255, 0.08) 44%,
+      transparent 61%);
+  transform: scaleX(calc(0.9 + var(--sweep) * 0.034));
 }
 
 .app:not([data-panel="idle"]) .scythe {
-  filter: drop-shadow(0 0 calc(10px + var(--light) * 30px) rgba(255, 255, 255, 0.54));
+  filter: drop-shadow(0 0 calc(8px + var(--light) * 24px) rgba(255, 255, 255, 0.48));
 }
 
 .app[data-panel="idle"] .control-panel,
@@ -642,15 +628,24 @@ audio {
   }
 
   .scythe {
-    width: clamp(260px, 48vw, 360px);
-    height: 86vh;
+    --scythe-width: clamp(280px, 62vw, 420px);
+    --scythe-height: 92vh;
+    --scythe-offset: calc(var(--scythe-width) * -0.64);
   }
+}
 
-  .scythe-left {
-    left: calc(clamp(135px, 24vw, 230px) * -1);
+@media (min-aspect-ratio: 16 / 9) {
+  .scythe {
+    --scythe-width: clamp(340px, 52vh, 660px);
+    --scythe-height: 112vh;
+    --scythe-offset: calc(var(--scythe-width) * -0.72);
   }
+}
 
-  .scythe-right {
-    right: calc(clamp(135px, 24vw, 230px) * -1);
+@media (max-width: 520px) {
+  .scythe {
+    --scythe-width: clamp(260px, 70vw, 340px);
+    --scythe-height: 88vh;
+    --scythe-offset: calc(var(--scythe-width) * -0.6);
   }
 }

@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260612-scythe-slice-rebuild';
+window.__appVersion = '20260612-side-light-responsive-sync';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -73,7 +73,7 @@ let debugScaleMin = 99;
 let debugScaleMax = 0;
 let lastTransportAction = 0;
 
-const idleAfterMs = 28000;
+const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 
 function touch(panel = null) {
@@ -458,20 +458,14 @@ function flashSide(side, amount, reason = 'beat', beatIndex = lastBeatIndex, tim
 
 function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0) {
   const downbeat = beatIndex % Math.max(1, meter) === 0;
-  const strongAccent = downbeat
-    && (currentDrive > Math.max(0.32, driveAverage + 0.08)
-      || currentRise > Math.max(0.045, riseAverage * 2.1)
-      || lowEnergy > 0.34);
 
   if (kiaiTagged) {
     if (beatIndex % 2 === 0) {
       const amount = osuSideAlpha(leftEnergy, true);
       flashSide('left', amount, 'kiai-left', beatIndex, timeSinceBeat);
-      if (strongAccent) flashSide('right', amount * 0.62, 'kiai-accent-right', beatIndex, timeSinceBeat);
     } else {
       const amount = osuSideAlpha(rightEnergy, true);
       flashSide('right', amount, 'kiai-right', beatIndex, timeSinceBeat);
-      if (strongAccent) flashSide('left', amount * 0.62, 'kiai-accent-left', beatIndex, timeSinceBeat);
     }
     return;
   }
