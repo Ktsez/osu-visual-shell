@@ -499,10 +499,10 @@ input {
   position: fixed;
   top: 50%;
   --scythe-width: clamp(320px, 44vmin, 680px);
-  --scythe-height: clamp(520px, 112vmin, 980px);
+  --scythe-height: 150vh;
   --scythe-offset: calc(var(--scythe-width) * -0.7);
   width: var(--scythe-width);
-  height: min(var(--scythe-height), 96vh);
+  height: var(--scythe-height);
   pointer-events: none;
   opacity: 0;
   filter: drop-shadow(0 0 calc(8px + var(--light) * 28px) rgba(255, 255, 255, 0.5));
@@ -526,8 +526,8 @@ input {
 .side-slice {
   position: absolute;
   inset: 0;
-  border-radius: 46% 100% 100% 46% / 50%;
-  clip-path: ellipse(42% 44% at 100% 50%);
+  border-radius: 42% 100% 100% 42% / 50%;
+  clip-path: ellipse(38% 48% at 100% 50%);
   background:
     radial-gradient(ellipse at 100% 50%,
       rgba(255, 255, 255, 0.98) 0%,
@@ -541,24 +541,24 @@ input {
 }
 
 .side-slice-wash {
-  inset: -4% -8% -4% 4%;
-  clip-path: ellipse(48% 48% at 100% 50%);
-  opacity: calc(0.18 + var(--light) * 0.16);
-  filter: blur(calc(18px + var(--light) * 18px));
+  inset: 0 -8% 0 10%;
+  clip-path: ellipse(44% 50% at 100% 50%);
+  opacity: calc(0.14 + var(--light) * 0.12);
+  filter: blur(calc(22px + var(--light) * 20px));
   transform: scaleX(calc(1.02 + var(--sweep) * 0.02)) scaleY(1.02);
 }
 
 .side-slice-body {
-  inset: 5% 2% 5% 18%;
-  clip-path: ellipse(40% 44% at 100% 50%);
+  inset: 9% 2% 9% 22%;
+  clip-path: ellipse(38% 47% at 100% 50%);
   opacity: calc(0.66 + var(--light) * 0.2);
   filter: blur(3px);
   transform: scaleX(calc(0.96 + var(--sweep) * 0.018));
 }
 
 .side-slice-hot {
-  inset: 15% 6% 15% 45%;
-  clip-path: ellipse(30% 39% at 100% 50%);
+  inset: 20% 6% 20% 48%;
+  clip-path: ellipse(28% 43% at 100% 50%);
   opacity: calc(0.72 + var(--light) * 0.18);
   filter: blur(1.2px);
   background:
@@ -629,7 +629,7 @@ audio {
 
   .scythe {
     --scythe-width: clamp(280px, 62vw, 420px);
-    --scythe-height: 92vh;
+    --scythe-height: 150vh;
     --scythe-offset: calc(var(--scythe-width) * -0.64);
   }
 }
@@ -637,7 +637,7 @@ audio {
 @media (min-aspect-ratio: 16 / 9) {
   .scythe {
     --scythe-width: clamp(340px, 52vh, 660px);
-    --scythe-height: 112vh;
+    --scythe-height: 150vh;
     --scythe-offset: calc(var(--scythe-width) * -0.72);
   }
 }
@@ -645,7 +645,7 @@ audio {
 @media (max-width: 520px) {
   .scythe {
     --scythe-width: clamp(260px, 70vw, 340px);
-    --scythe-height: 88vh;
+    --scythe-height: 150vh;
     --scythe-offset: calc(var(--scythe-width) * -0.6);
   }
 }

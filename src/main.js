@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260612-side-light-responsive-sync';
+window.__appVersion = '20260612-side-light-stage-fill';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -72,14 +72,19 @@ let scytheEvents = [];
 let debugScaleMin = 99;
 let debugScaleMax = 0;
 let lastTransportAction = 0;
+let lastUiActionAt = 0;
 
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
+const blankDismissDelayMs = 300;
 
 function touch(panel = null) {
   lastInteraction = performance.now();
   document.body.classList.remove('is-idle');
-  if (panel) app.dataset.panel = panel;
+  if (panel) {
+    markUiAction();
+    app.dataset.panel = panel;
+  }
 }
 
 function setStatus(text) {
@@ -88,6 +93,31 @@ function setStatus(text) {
 
 function setPanel(panel) {
   touch(panel);
+}
+
+function markUiAction() {
+  lastUiActionAt = performance.now();
+}
+
+function setIdlePanel() {
+  lastInteraction = performance.now();
+  app.dataset.panel = 'idle';
+  document.body.classList.add('is-idle');
+}
+
+function isInterfaceTarget(target) {
+  return Boolean(target?.closest?.('.core, .control-panel, .float-panel, button, input, label, .track, [role="button"]'));
+}
+
+function handleBlankDismiss(event) {
+  if (isInterfaceTarget(event.target)) {
+    markUiAction();
+    return false;
+  }
+
+  if (app.dataset.panel === 'idle' || performance.now() - lastUiActionAt < blankDismissDelayMs) return false;
+  setIdlePanel();
+  return true;
 }
 
 function resize() {
@@ -335,6 +365,7 @@ function stepTrack(delta) {
 function runTransport(event, action) {
   event?.preventDefault();
   event?.stopPropagation();
+  markUiAction();
   const now = performance.now();
   if (now - lastTransportAction < 180) return;
   lastTransportAction = now;
@@ -411,12 +442,13 @@ function osuSideAlpha(channel, kiai) {
   const kiaiMultiplier = (1 - amplitudeDeadZone * 0.95) / 0.8;
   const multiplier = kiai ? kiaiMultiplier : alphaMultiplier;
   const originalAlpha = 0.1 + (channel - amplitudeDeadZone) / multiplier;
-  const base = kiai ? 0.32 : 0.27;
+  const base = kiai ? 0.24 : 0.08;
   const drive = Math.max(channel, lowEnergy * 0.82, currentDrive * 0.64, smoothedEnergy * 0.72);
-  const audioLift = Math.sqrt(Math.max(0, drive)) * (kiai ? 0.44 : 0.38);
-  const riseLift = Math.min(0.16, currentRise * 1.5);
+  const audioLift = Math.sqrt(Math.max(0, drive)) * (kiai ? 0.44 : 0.3);
+  const riseLift = Math.min(kiai ? 0.16 : 0.1, currentRise * 1.5);
   const liftedAlpha = base + audioLift + riseLift;
-  return Math.max(base, Math.min(0.94, Math.max(originalAlpha, liftedAlpha)));
+  const floor = kiai ? base : 0.06;
+  return Math.max(floor, Math.min(0.94, Math.max(originalAlpha, liftedAlpha)));
 }
 
 function beatIndexAtTimeMs(currentTrackTime, point) {
@@ -471,8 +503,14 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
   }
 
   if (downbeat) {
-    flashSide('left', osuSideAlpha(leftEnergy, false), 'downbeat-left', beatIndex, timeSinceBeat);
-    flashSide('right', osuSideAlpha(rightEnergy, false), 'downbeat-right', beatIndex, timeSinceBeat);
+    const leftAmount = osuSideAlpha(leftEnergy, false);
+    const rightAmount = osuSideAlpha(rightEnergy, false);
+    const normalActivity = Math.max(lowEnergy, midEnergy * 0.82, smoothedEnergy, currentDrive * 0.72);
+    const enoughPresence = Math.max(leftAmount, rightAmount) > 0.3 || normalActivity > 0.26 || currentRise > 0.045;
+    if (!enoughPresence) return;
+
+    flashSide('left', leftAmount, 'downbeat-left', beatIndex, timeSinceBeat);
+    flashSide('right', rightAmount, 'downbeat-right', beatIndex, timeSinceBeat);
   }
 }
 
@@ -719,6 +757,7 @@ controlPanel.addEventListener('click', (event) => {
   runTransportButton(event, findTransportButton(event));
 }, { capture: true });
 window.addEventListener('pointerdown', (event) => {
+  if (handleBlankDismiss(event)) return;
   if (app.dataset.panel === 'idle') return;
   runTransportButton(event, findTransportButton(event));
 }, { capture: true });
