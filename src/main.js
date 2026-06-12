@@ -1,9 +1,10 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260612-lightfield-logo-fountain';
+window.__appVersion = '20260612-logo-breath-ripples';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
 const core = document.querySelector('#core');
+const coreAura = document.querySelector('#core-aura');
 const coreCover = document.querySelector('#core-cover');
 const coreSubtitle = document.querySelector('#core-subtitle');
 const miniState = document.querySelector('#mini-state');
@@ -71,6 +72,12 @@ let currentDrive = 0;
 let currentRise = 0;
 let driveAverage = 0;
 let riseAverage = 0;
+let audioAmplitude = 0;
+let amplitudeAverage = 0;
+let coreBreath = 0;
+let coreTargetBreath = 0;
+let calmWindow = 0;
+let lastRippleAt = -10000;
 let currentBeatLengthMs = 620;
 let activeTimingPoint = null;
 let activeEffectPoint = null;
@@ -82,6 +89,7 @@ let draggingProgress = false;
 let particles = [];
 let starParticles = [];
 let fountainBursts = [];
+let rippleRings = [];
 let scytheEvents = [];
 let debugScaleMin = 99;
 let debugScaleMax = 0;
@@ -337,11 +345,18 @@ async function playIndex(index) {
   currentRise = 0;
   driveAverage = 0;
   riseAverage = 0;
+  audioAmplitude = 0;
+  amplitudeAverage = 0;
+  coreBreath = 0;
+  coreTargetBreath = 0;
+  calmWindow = 0;
   scytheEvents = [];
   starParticles = [];
   fountainBursts = [];
+  rippleRings = [];
   lastKiaiState = Boolean(activeEffectPoint?.kiai);
   lastFountainAt = -10000;
+  lastRippleAt = -10000;
   visualizerBars.fill(0);
   markActiveTrack();
   setStatus(track.timingPoints?.length ? `已读取 ${track.timingPoints.length} 个 timing points。` : '已载入，使用音频分析。');
@@ -470,15 +485,15 @@ function updateTiming() {
     lastBeatIndex = null;
     lastBeatTimingPoint = null;
     sectionHeat = Math.max(sectionHeat, 0.9);
-    beatAccent = Math.max(beatAccent, 0.78);
-    coreFlash = Math.max(coreFlash, 0.74);
+    beatAccent = Math.max(beatAccent, 0.46);
+    coreFlash = Math.max(coreFlash, 0.28);
   }
   activeEffectPoint = effectPoint;
 
   const kiaiNow = Boolean(effectPoint?.kiai);
   if (kiaiNow && !lastKiaiState && Math.abs(syncMs - effectPoint.offset) < 1100) {
-    triggerStarFountain(1.05, 'kiai-start');
-    coreFlash = Math.max(coreFlash, 1);
+    maybeTriggerStarFountain(1.05, 'kiai-start');
+    coreFlash = Math.max(coreFlash, 0.72);
   }
   lastKiaiState = kiaiNow;
 
@@ -496,21 +511,25 @@ function updateTiming() {
 
   const timeSinceBeat = timeSinceBeatMs(syncMs, point);
   const amplitudeAdjust = Math.min(1, 0.4 + Math.max(lowEnergy, midEnergy, smoothedEnergy));
-  timingPulse = Math.max(timingPulse, 0.36 + amplitudeAdjust * 0.42);
-  logoPulse = Math.max(logoPulse, 0.3 + amplitudeAdjust * 0.5);
+  timingPulse = Math.max(timingPulse, 0.18 + amplitudeAdjust * 0.2);
+  logoPulse = Math.max(logoPulse, 0.12 + amplitudeAdjust * 0.18);
 
   const meter = Math.max(1, point.meter || 4);
   if (beatIndex % meter === 0) {
     sectionHeat = Math.max(sectionHeat, 0.78);
     beatAccent = Math.max(beatAccent, 1);
     beatWindow = 1;
-    coreFlash = Math.max(coreFlash, 0.92);
+    coreFlash = Math.max(coreFlash, 0.58);
+    spawnRipple(0.7 + amplitudeAdjust * 0.45, 'downbeat');
     if (kiaiNow || currentDrive > driveAverage + 0.08 || currentRise > Math.max(0.06, riseAverage * 2.4)) {
-      triggerStarFountain(kiaiNow ? 0.8 : 0.55, 'strong-downbeat');
+      maybeTriggerStarFountain(kiaiNow ? 0.8 : 0.55, 'strong-downbeat');
     }
   } else {
     beatAccent = Math.max(beatAccent, 0.42);
     beatWindow = Math.max(beatWindow, 0.55);
+    if (currentRise > Math.max(0.075, riseAverage * 2.8) && currentDrive > driveAverage + 0.12) {
+      spawnRipple(0.36 + amplitudeAdjust * 0.28, 'audio-rise');
+    }
   }
 
   handleOsuSideFlashBeat(beatIndex, meter, kiaiNow, timeSinceBeat);
@@ -652,6 +671,8 @@ function updateAudioEnergy() {
     lowEnergy *= 0.94;
     midEnergy *= 0.94;
     smoothedEnergy *= 0.95;
+    audioAmplitude *= 0.94;
+    coreTargetBreath *= 0.9;
     return;
   }
 
@@ -676,6 +697,17 @@ function updateAudioEnergy() {
   currentRise = positiveRise;
   driveAverage = driveAverage * 0.985 + drive * 0.015;
   riseAverage = riseAverage * 0.94 + positiveRise * 0.06;
+  const peak = Math.max(low, mid, left, right);
+  audioAmplitude = audioAmplitude * 0.82 + peak * 0.18;
+  amplitudeAverage = amplitudeAverage * 0.992 + audioAmplitude * 0.008;
+  const overAverage = Math.max(0, audioAmplitude - Math.max(0.08, amplitudeAverage * 0.92));
+  coreTargetBreath = Math.min(1.15, Math.pow(Math.max(0, overAverage) * 2.2 + positiveRise * 4.8, 0.72));
+
+  if (drive < Math.max(0.08, driveAverage * 0.7) && audioAmplitude < Math.max(0.12, amplitudeAverage * 0.82)) {
+    calmWindow = Math.min(1.6, calmWindow + 0.032);
+  } else {
+    calmWindow *= 0.985;
+  }
 
   if (lowRise > 0.06 && low > 0.22) {
     logoPulse = Math.max(logoPulse, Math.min(1.2, low * 1.3));
@@ -687,23 +719,27 @@ function updateAudioEnergy() {
 }
 
 function updateLogoAmplitudes(now, elapsed) {
-  const decayFactor = elapsed * 0.0024;
+  const decayFactor = elapsed * 0.00145;
   for (let i = 0; i < visualizerBars.length; i += 1) {
     visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
   }
 
-  if (!freqData || audio.paused || now - lastVisualizerUpdate < 50) return;
+  if (!freqData || audio.paused || now - lastVisualizerUpdate < 70) return;
   lastVisualizerUpdate = now;
 
-  const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
+  const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.62;
+  const dynamicRange = 0.16 + Math.max(0.04, amplitudeAverage) * 1.55;
+  const userScale = 0.2 + settings.visualizer * 0.42;
   for (let i = 0; i < visualizerBars.length; i += 1) {
     const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
     const raw = (freqData[sourceIndex] || 0) / 255;
-    const target = Math.max(0, raw - 0.012) * kiaiMultiplier * settings.visualizer;
+    const normalised = Math.max(0, raw - 0.018) / dynamicRange;
+    const compressed = 1 - Math.exp(-normalised * 0.72);
+    const target = Math.min(0.3, compressed * 0.23 * kiaiMultiplier * userScale);
     if (target > visualizerBars[i]) visualizerBars[i] = Math.min(0.52, target);
   }
-  visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
+  visualizerOffset = (visualizerOffset + 3) % visualizerBars.length;
 }
 
 function spawnBurst(count = 10) {
@@ -726,17 +762,42 @@ function spawnBurst(count = 10) {
   particles = particles.slice(-320);
 }
 
+function spawnRipple(power = 0.6, reason = 'beat') {
+  const now = performance.now();
+  if (now - lastRippleAt < 120) return;
+  lastRippleAt = now;
+  rippleRings.push({
+    start: now,
+    duration: 720 + power * 320,
+    power,
+    reason,
+  });
+  rippleRings = rippleRings.slice(-12);
+}
+
+function maybeTriggerStarFountain(power = 1, reason = 'kiai') {
+  const trackTime = audio.currentTime || 0;
+  const suddenReturn = calmWindow > 0.44 && currentRise > Math.max(0.065, riseAverage * 2.35) && currentDrive > Math.max(0.28, driveAverage + 0.11);
+  const afterIntro = trackTime >= 10;
+  const earlyException = trackTime >= 6 && calmWindow > 0.95 && suddenReturn && currentDrive > 0.42;
+  const kiaiCut = reason === 'kiai-start' && (suddenReturn || currentDrive > Math.max(0.34, driveAverage + 0.16));
+  const strongCut = reason !== 'kiai-start' && suddenReturn;
+
+  if ((!afterIntro && !earlyException) || (!kiaiCut && !strongCut)) return;
+  triggerStarFountain(power * (suddenReturn ? 1.15 : 0.86), reason);
+}
+
 function triggerStarFountain(power = 1, reason = 'kiai') {
   if (settings.fountain <= 0.02) return;
   const now = performance.now();
-  const cooldown = reason === 'kiai-start' ? 900 : 2400 - settings.fountain * 520;
+  const cooldown = reason === 'kiai-start' ? 1800 : 2800 - settings.fountain * 460;
   if (now - lastFountainAt < cooldown) return;
   lastFountainAt = now;
 
   const direction = Math.floor(Math.random() * 3) - 1;
   fountainBursts.push({
     start: now,
-    end: now + 760 + power * 180,
+    end: now + 860 + power * 220,
     power: power * settings.fountain,
     direction,
     lastSpawn: now - 20,
@@ -763,18 +824,19 @@ function updateStarFountains(now, elapsed) {
         const y = height + 18;
         const fan = burst.direction * side * 360 * (1 - progress * 1.8);
         const vx = fan + (Math.random() - 0.5) * 150;
-        const vy = -760 - Math.random() * 360 - burst.power * 190;
+        const vy = -1020 - Math.random() * 460 - burst.power * 260;
         starParticles.push({
           x,
           y,
           vx,
           vy,
-          gravity: 900,
+          gravity: 980,
           age: 0,
-          duration: 460 + Math.random() * 640,
-          size: 4.2 + Math.random() * 5.8,
+          duration: 620 + Math.random() * 760,
+          size: 9.5 + Math.random() * 10.5,
           rotation: Math.random() * Math.PI * 2,
           spin: (Math.random() - 0.5) * 7,
+          hollow: Math.random() < 0.34,
         });
       }
     }
@@ -791,26 +853,62 @@ function updateStarFountains(now, elapsed) {
   starParticles = starParticles.filter((particle) => particle.age < particle.duration && particle.y < height + 80);
 }
 
-function drawStar(ctx, x, y, radius, rotation, alpha) {
-  const inner = radius * 0.46;
+function drawStar(ctx, x, y, radius, rotation, alpha, hollow = false) {
+  const inner = radius * 0.5;
+  const points = [];
+  for (let i = 0; i < 10; i += 1) {
+    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 === 0 ? radius : inner;
+    points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
   ctx.beginPath();
-  for (let i = 0; i < 10; i += 1) {
-    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
-    const r = i % 2 === 0 ? radius : inner;
-    const px = Math.cos(angle) * r;
-    const py = Math.sin(angle) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+  for (let i = 0; i < points.length; i += 1) {
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    const control = {
+      x: current.x * 0.88 + next.x * 0.12,
+      y: current.y * 0.88 + next.y * 0.12,
+    };
+    if (i === 0) ctx.moveTo(current.x, current.y);
+    ctx.quadraticCurveTo(control.x, control.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
   }
   ctx.closePath();
-  ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
   ctx.shadowColor = `rgba(255, 255, 255, ${alpha})`;
   ctx.shadowBlur = 10 + radius * 1.2;
-  ctx.fill();
+  if (hollow) {
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.92})`;
+    ctx.lineWidth = Math.max(2, radius * 0.18);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fill();
+  }
   ctx.restore();
+}
+
+function drawRippleRings(cx, cy, coreSize, now) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.lineCap = 'round';
+  for (const ring of rippleRings) {
+    const progress = Math.max(0, Math.min(1, (now - ring.start) / ring.duration));
+    const eased = 1 - Math.pow(1 - progress, 2.6);
+    const radius = coreSize * (0.5 + eased * (0.34 + ring.power * 0.12));
+    const alpha = (1 - progress) * (0.16 + ring.power * 0.12);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.lineWidth = Math.max(2, coreSize * 0.008 * (1 - progress * 0.45));
+    ctx.shadowColor = `rgba(255, 130, 210, ${alpha * 0.7})`;
+    ctx.shadowBlur = 18 + ring.power * 18;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+  rippleRings = rippleRings.filter((ring) => now - ring.start < ring.duration);
 }
 
 function formatTime(seconds) {
@@ -850,6 +948,8 @@ function draw() {
   coreFlash *= Math.exp(-elapsed / 145);
   lightEnergy *= Math.exp(-elapsed / 420);
   lightSweep *= Math.exp(-elapsed / 260);
+  coreBreath += (coreTargetBreath - coreBreath) * Math.min(1, elapsed / 180);
+  coreTargetBreath *= Math.exp(-elapsed / 420);
   const leftSoft = envelopeValue(sideEnvelopes.leftSoft, now);
   const rightSoft = envelopeValue(sideEnvelopes.rightSoft, now);
   const leftHard = envelopeValue(sideEnvelopes.leftHard, now);
@@ -869,16 +969,16 @@ function draw() {
   const height = window.innerHeight;
   ctx.clearRect(0, 0, width, height);
 
-  const beatMotion = !audio.paused ? continuousBeat * 0.045 : 0;
-  const energy = Math.max(smoothedEnergy * 1.35, logoPulse * 0.86, timingPulse * 0.62, beatMotion);
-  const earlyDip = timingPulse > 0.5 ? -0.012 * Math.min(1, timingPulse) : 0;
+  const beatMotion = !audio.paused ? continuousBeat * 0.015 : 0;
+  const energy = Math.max(smoothedEnergy * 1.08, logoPulse * 0.34, coreBreath * 0.92, beatMotion);
+  const earlyDip = timingPulse > 0.5 ? -0.005 * Math.min(1, timingPulse) : 0;
   const coreRect = core.getBoundingClientRect();
   const targetFollowX = coreHover ? Math.max(-9, Math.min(9, (pointerX - (coreRect.left + coreRect.width / 2)) * 0.045)) : 0;
   const targetFollowY = coreHover ? Math.max(-9, Math.min(9, (pointerY - (coreRect.top + coreRect.height / 2)) * 0.045)) : 0;
   coreFollowX += (targetFollowX - coreFollowX) * Math.min(1, elapsed / 120);
   coreFollowY += (targetFollowY - coreFollowY) * Math.min(1, elapsed / 120);
   const hoverBoost = coreHover ? 0.045 : 0;
-  const coreScale = 1 + (energy * 0.16 + timingPulse * 0.035) * settings.pulse + hoverBoost + earlyDip;
+  const coreScale = 1 + (coreBreath * 0.058 + energy * 0.035 + timingPulse * 0.008) * settings.pulse + hoverBoost + earlyDip;
   debugScaleMin = Math.min(debugScaleMin, coreScale);
   debugScaleMax = Math.max(debugScaleMax, coreScale);
   window.__visualDebug = {
@@ -898,6 +998,10 @@ function draw() {
     sideEnvelopes,
     beatAccent,
     coreFlash,
+    coreBreath,
+    audioAmplitude,
+    amplitudeAverage,
+    calmWindow,
     scytheEvents,
     scytheEventCount: scytheEvents.length,
     starParticles: starParticles.length,
@@ -907,10 +1011,14 @@ function draw() {
     currentTime: audio.currentTime,
   };
   core.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale})`;
+  if (coreAura) {
+    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${0.96 + coreBreath * 0.1})`;
+  }
   core.style.boxShadow = `0 0 ${54 + energy * 170 + coreFlash * 80}px rgba(255, 72, 169, ${Math.min(0.9, 0.34 + energy * 0.5 + coreFlash * 0.22)})`;
 
   document.documentElement.style.setProperty('--energy', energy.toFixed(3));
   document.documentElement.style.setProperty('--core-flash', Math.min(1, coreFlash).toFixed(3));
+  document.documentElement.style.setProperty('--core-breath', Math.min(1.2, coreBreath).toFixed(3));
   const visualLight = Math.max(lightEnergy, sectionHeat * 0.12);
   document.documentElement.style.setProperty('--light', Math.min(1.25, visualLight).toFixed(3));
   document.documentElement.style.setProperty('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(3));
@@ -926,7 +1034,8 @@ function draw() {
 
   const cx = width * 0.5;
   const cy = height * 0.5;
-  drawLogoVisualizer(cx, cy, energy);
+  drawRippleRings(cx + coreFollowX, cy + coreFollowY, coreRect.width, now);
+  drawLogoVisualizer(cx + coreFollowX, cy + coreFollowY, energy);
 
   for (const particle of particles) {
     particle.x += particle.vx;
@@ -944,7 +1053,7 @@ function draw() {
   for (const particle of starParticles) {
     const progress = particle.age / particle.duration;
     const alpha = Math.max(0, (1 - progress) * 0.92);
-    drawStar(ctx, particle.x, particle.y, particle.size * (1 + progress * 1.25), particle.rotation, alpha);
+    drawStar(ctx, particle.x, particle.y, particle.size * (1 + progress * 1.1), particle.rotation, alpha, particle.hollow);
   }
   } catch (error) {
     window.__visualError = error?.stack || String(error);
@@ -955,24 +1064,24 @@ function drawLogoVisualizer(cx, cy, energy) {
   const bars = visualizerBars.length;
   const visualiserRounds = 5;
   const coreSize = core.getBoundingClientRect().width || Math.min(window.innerWidth, window.innerHeight) * 0.4;
-  const baseRadius = coreSize * 0.515;
-  const maxBarLength = coreSize * 1.38;
-  const barWidth = Math.max(1.25, (Math.PI * 2 * baseRadius) / bars * 0.42);
+  const baseRadius = coreSize * 0.51;
+  const maxBarLength = coreSize * 0.38;
+  const barWidth = Math.max(3.2, (Math.PI * 2 * baseRadius) / bars * 0.68);
   const deadZone = 1 / Math.max(1, maxBarLength);
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(performance.now() / 14000);
-  ctx.lineCap = 'butt';
+  ctx.rotate(performance.now() / 23000);
+  ctx.lineCap = 'round';
   for (let round = 0; round < visualiserRounds; round += 1) {
     const roundOffset = (round * Math.PI * 2) / visualiserRounds;
     for (let i = 0; i < bars; i += 1) {
       const amplitude = visualizerBars[i];
       if (amplitude <= deadZone && energy < 0.04) continue;
       const angle = (i / bars) * Math.PI * 2 + roundOffset;
-      const length = Math.max(1.5, amplitude * maxBarLength + energy * 5);
-      const r1 = baseRadius + 7;
+      const length = Math.max(2.5, amplitude * maxBarLength + Math.min(5, energy * 3));
+      const r1 = baseRadius + 9;
       const r2 = r1 + length;
-      const alpha = Math.min(0.56, 0.045 + amplitude * 1.4 + energy * 0.06);
+      const alpha = Math.min(0.34, 0.035 + amplitude * 0.9 + energy * 0.035);
       ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
       ctx.lineWidth = barWidth;
       ctx.beginPath();
@@ -1004,20 +1113,8 @@ core.addEventListener('keydown', (event) => {
   setPanel(app.dataset.panel === 'controls' ? 'idle' : 'controls');
 });
 controlPanel.addEventListener('pointerdown', () => touch('controls'));
-controlPanel.addEventListener('pointerdown', (event) => {
-  runTransportButton(event, findTransportButton(event));
-}, { capture: true });
-controlPanel.addEventListener('click', (event) => {
-  runTransportButton(event, findTransportButton(event));
-}, { capture: true });
 window.addEventListener('pointerdown', (event) => {
-  if (handleBlankDismiss(event)) return;
-  if (app.dataset.panel === 'idle') return;
-  runTransportButton(event, findTransportButton(event));
-}, { capture: true });
-window.addEventListener('click', (event) => {
-  if (app.dataset.panel === 'idle') return;
-  runTransportButton(event, findTransportButton(event));
+  handleBlankDismiss(event);
 }, { capture: true });
 window.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -1043,13 +1140,9 @@ document.querySelector('#close-settings').addEventListener('click', () => setPan
 document.querySelector('#detect-osu').addEventListener('click', detectOsu);
 document.querySelector('#scan-osu').addEventListener('click', () => scan('osu'));
 document.querySelector('#scan-music').addEventListener('click', () => scan('music'));
-playButton.addEventListener('click', (event) => {
-  if (performance.now() - lastTransportAction < 280) {
-    event.preventDefault();
-    return;
-  }
-  togglePlay();
-});
+document.querySelector('#prev').addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
+playButton.addEventListener('click', (event) => runTransport(event, togglePlay));
+document.querySelector('#next').addEventListener('click', (event) => runTransport(event, () => stepTrack(1)));
 search.addEventListener('input', renderList);
 
 progress.addEventListener('pointerdown', () => {

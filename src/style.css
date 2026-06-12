@@ -12,6 +12,7 @@
   --left-hard: 0;
   --right-hard: 0;
   --core-flash: 0;
+  --core-breath: 0;
   color: #fff;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -100,7 +101,8 @@ button:hover,
   position: fixed;
   top: 50%;
   left: 50%;
-  width: clamp(320px, 44vmin, 520px);
+  z-index: 4;
+  width: clamp(470px, 66vmin, 780px);
   aspect-ratio: 1;
   border: clamp(5px, 0.75vmin, 8px) solid rgba(255, 255, 255, calc(0.84 + var(--core-flash) * 0.16));
   border-radius: 50%;
@@ -121,9 +123,43 @@ button:hover,
   will-change: transform, box-shadow;
 }
 
+.core-aura {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: clamp(560px, 78vmin, 920px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 3;
+  opacity: calc(0.18 + var(--core-breath) * 0.28 + var(--core-flash) * 0.22);
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, calc(0.08 + var(--core-flash) * 0.16)) 0 34%, transparent 54%),
+    radial-gradient(circle, rgba(255, 90, 185, calc(0.28 + var(--core-breath) * 0.2)) 0 44%, transparent 70%);
+  filter: blur(calc(18px + var(--core-breath) * 16px));
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%) scale(calc(0.96 + var(--core-breath) * 0.1));
+  will-change: transform, opacity, filter;
+}
+
+.core-pulse-glow {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: calc(0.12 + var(--core-breath) * 0.34 + var(--core-flash) * 0.28);
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(255, 255, 255, 0.18) 47%, transparent 62%),
+    radial-gradient(circle at 48% 44%, rgba(255, 255, 255, 0.16), transparent 44%);
+  filter: blur(calc(9px + var(--core-breath) * 12px));
+  mix-blend-mode: screen;
+}
+
 .core-cover {
   position: absolute;
   inset: 18px;
+  z-index: 0;
   border-radius: 50%;
   background:
     radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.6), transparent 14%),
@@ -131,7 +167,6 @@ button:hover,
   background-position: center;
   background-size: cover;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
-  animation: coverRotate 46s linear infinite;
 }
 
 .app[data-panel="controls"] .core,
@@ -147,6 +182,7 @@ button:hover,
   inset: 16px;
   border: 2px solid rgba(255, 255, 255, calc(0.32 + var(--core-flash) * 0.22));
   border-radius: inherit;
+  z-index: 2;
 }
 
 .core::after {
@@ -155,6 +191,7 @@ button:hover,
   inset: 34px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: inherit;
+  z-index: 2;
 }
 
 .core-subtitle {
@@ -193,7 +230,7 @@ button:hover,
 .app[data-panel="scan"] .core,
 .app[data-panel="songs"] .core,
 .app[data-panel="settings"] .core {
-  width: clamp(340px, 48vmin, 540px);
+  width: clamp(510px, 70vmin, 820px);
   border-width: 4px;
 }
 
@@ -215,11 +252,11 @@ button:hover,
 }
 
 .halo-a {
-  width: min(46vw, 520px);
+  width: clamp(620px, 82vmin, 980px);
 }
 
 .halo-b {
-  width: min(57vw, 660px);
+  width: clamp(760px, 98vmin, 1160px);
   border-color: rgba(255, 255, 255, 0.16);
   transform: translate(-50%, -50%) scale(calc(1 + var(--light) * 0.12));
 }
@@ -603,7 +640,7 @@ input {
 }
 
 .is-idle .core {
-  width: clamp(330px, 46vmin, 540px);
+  width: clamp(500px, 70vmin, 820px);
 }
 
 audio {
@@ -631,7 +668,11 @@ audio {
 
 @media (max-width: 980px) {
   .core {
-    width: clamp(300px, 78vw, 390px);
+    width: clamp(330px, 86vw, 560px);
+  }
+
+  .core-aura {
+    width: clamp(390px, 98vw, 660px);
   }
 
   .scan-panel,
@@ -662,6 +703,23 @@ audio {
 }
 
 @media (max-width: 520px) {
+  .core,
+  .is-idle .core,
+  .app[data-panel="controls"] .core,
+  .app[data-panel="scan"] .core,
+  .app[data-panel="songs"] .core,
+  .app[data-panel="settings"] .core {
+    width: min(86vw, 390px);
+  }
+
+  .halo-a {
+    width: min(104vw, 470px);
+  }
+
+  .halo-b {
+    width: min(126vw, 560px);
+  }
+
   .scythe {
     --scythe-width: clamp(170px, 58vw, 300px);
   }
