@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-settings-visualizer-tune';
+window.__appVersion = '20260613-tuned-defaults-wide-ranges';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -106,24 +106,24 @@ let lastAudioFountainAt = -10000;
 
 const visualizerBars = new Float32Array(200);
 const defaultSettings = {
-  sideIntensity: 1,
-  sideRestraint: 0.55,
-  pulse: 1,
-  visualizer: 1,
-  visualizerRange: 3,
-  visualizerContrast: 1.35,
-  visualizerDecay: 1,
-  waveSize: 1,
-  waveIntensity: 1,
-  fountain: 1,
-  fountainSensitivity: 1.25,
+  sideIntensity: 1.1,
+  sideRestraint: 1,
+  pulse: 1.8,
+  visualizer: 2.4,
+  visualizerRange: 2.6,
+  visualizerContrast: 1.6,
+  visualizerDecay: 1.3,
+  waveSize: 0.8,
+  waveIntensity: 2,
+  fountain: 1.6,
+  fountainSensitivity: 2,
 };
 const settings = { ...defaultSettings };
 
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v2';
+const settingsKey = 'osu-visual-shell-settings-v3';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -592,7 +592,7 @@ function osuSideAlpha(channel, kiai) {
   const riseLift = Math.min(kiai ? 0.16 : 0.08, currentRise * 1.35);
   const liftedAlpha = base + audioLift + riseLift;
   const floor = kiai ? base : 0;
-  return Math.max(floor, Math.min(0.94, Math.max(originalAlpha, liftedAlpha))) * settings.sideIntensity;
+  return Math.max(floor, Math.min(0.94, Math.max(originalAlpha, liftedAlpha))) * Math.max(0, settings.sideIntensity);
 }
 
 function beatIndexAtTimeMs(currentTrackTime, point) {
@@ -771,7 +771,7 @@ function updateAudioEnergy() {
 }
 
 function updateLogoAmplitudes(now, elapsed) {
-  const decayFactor = elapsed * 0.0024 * settings.visualizerDecay;
+  const decayFactor = elapsed * 0.0024 * Math.max(0.05, settings.visualizerDecay);
   for (let i = 0; i < visualizerBars.length; i += 1) {
     visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
@@ -784,7 +784,7 @@ function updateLogoAmplitudes(now, elapsed) {
   const dynamicRange = 0.07 + Math.max(0.035, amplitudeAverage) * 0.9;
   const userScale = 0.72 + settings.visualizer * 0.36;
   const noiseFloor = Math.max(0.026, amplitudeAverage * 0.2);
-  const contrast = settings.visualizerContrast || 1.35;
+  const contrast = Math.max(0.1, settings.visualizerContrast || 1.6);
   const startupLimiter = Math.min(1, Math.max(0.18, (audio.currentTime || 0) / 2.8));
   const attackLimit = (0.018 + Math.min(0.052, audioAmplitude * 0.07)) * (activeEffectPoint?.kiai ? 1.22 : 1);
   for (let i = 0; i < visualizerBars.length; i += 1) {
@@ -852,7 +852,7 @@ function maybeTriggerStarFountain(power = 1, reason = 'kiai') {
   const now = performance.now();
   if (now - lastAudioFountainAt < 6500) return;
 
-  const sensitivity = settings.fountainSensitivity || 1;
+  const sensitivity = Math.max(0.1, settings.fountainSensitivity || 2);
   const meaningfulRise = currentRise > Math.max(0.042, riseAverage * (1.9 / sensitivity));
   const suddenReturn = calmWindow > 0.32 / sensitivity && meaningfulRise && currentDrive > Math.max(0.26, driveAverage + 0.08 / sensitivity);
   const strongLift = currentDrive > Math.max(0.34, driveAverage + 0.16 / sensitivity) && currentRise > Math.max(0.055, riseAverage * 2.1 / sensitivity);
@@ -972,10 +972,10 @@ function drawRippleRings(cx, cy, coreSize, now) {
   for (const ring of rippleRings) {
     const progress = Math.max(0, Math.min(1, (now - ring.start) / ring.duration));
     const eased = 1 - Math.pow(1 - progress, 2.05);
-    const maxRadius = Math.min(window.innerWidth, window.innerHeight) * 0.67 * settings.waveSize;
+    const maxRadius = Math.min(window.innerWidth, window.innerHeight) * 0.67 * Math.max(0.05, settings.waveSize);
     const radius = coreSize * 0.46 + eased * maxRadius;
     const fade = Math.pow(1 - progress, 1.06);
-    const alpha = fade * (0.34 + ring.power * 0.28) * settings.waveIntensity;
+    const alpha = fade * (0.34 + ring.power * 0.28) * Math.max(0, settings.waveIntensity);
     const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
     gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.74})`);
     gradient.addColorStop(0.24, `rgba(255, 255, 255, ${alpha * 0.36})`);
@@ -1148,7 +1148,7 @@ function drawLogoVisualizer(cx, cy, energy) {
   const visualiserRounds = 5;
   const coreSize = core.getBoundingClientRect().width || Math.min(window.innerWidth, window.innerHeight) * 0.4;
   const baseRadius = coreSize * 0.472;
-  const maxBarLength = coreSize * 0.58 * settings.visualizerRange;
+  const maxBarLength = coreSize * 0.58 * Math.max(0.05, settings.visualizerRange);
   const barWidth = Math.max(5.2, (Math.PI * 2 * coreSize * 0.5) / bars * 0.86);
   const deadZone = Math.max(0.0075, 1 / Math.max(1, maxBarLength));
   ctx.save();
