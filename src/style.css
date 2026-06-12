@@ -13,6 +13,7 @@
   --right-hard: 0;
   --core-flash: 0;
   --core-breath: 0;
+  --aura-breath: 0;
   color: #fff;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -132,11 +133,11 @@ button:hover,
   border-radius: 50%;
   pointer-events: none;
   z-index: 3;
-  opacity: calc(0.18 + var(--core-breath) * 0.28 + var(--core-flash) * 0.22);
+  opacity: calc(0.2 + var(--aura-breath) * 0.36 + var(--core-flash) * 0.16);
   background:
     radial-gradient(circle, rgba(255, 255, 255, calc(0.08 + var(--core-flash) * 0.16)) 0 34%, transparent 54%),
-    radial-gradient(circle, rgba(255, 90, 185, calc(0.28 + var(--core-breath) * 0.2)) 0 44%, transparent 70%);
-  filter: blur(calc(18px + var(--core-breath) * 16px));
+    radial-gradient(circle, rgba(255, 90, 185, calc(0.24 + var(--aura-breath) * 0.24)) 0 44%, transparent 70%);
+  filter: blur(calc(22px + var(--aura-breath) * 24px));
   mix-blend-mode: screen;
   transform: translate(-50%, -50%) scale(calc(0.96 + var(--core-breath) * 0.1));
   will-change: transform, opacity, filter;
@@ -148,11 +149,11 @@ button:hover,
   border-radius: 50%;
   z-index: 1;
   pointer-events: none;
-  opacity: calc(0.12 + var(--core-breath) * 0.34 + var(--core-flash) * 0.28);
+  opacity: calc(0.1 + var(--aura-breath) * 0.34 + var(--core-flash) * 0.2);
   background:
     radial-gradient(circle at 50% 50%, transparent 0 38%, rgba(255, 255, 255, 0.18) 47%, transparent 62%),
     radial-gradient(circle at 48% 44%, rgba(255, 255, 255, 0.16), transparent 44%);
-  filter: blur(calc(9px + var(--core-breath) * 12px));
+  filter: blur(calc(12px + var(--aura-breath) * 18px));
   mix-blend-mode: screen;
 }
 

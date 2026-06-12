@@ -76,6 +76,7 @@ let audioAmplitude = 0;
 let amplitudeAverage = 0;
 let coreBreath = 0;
 let coreTargetBreath = 0;
+let auraBreath = 0;
 let calmWindow = 0;
 let lastRippleAt = -10000;
 let currentBeatLengthMs = 620;
@@ -349,6 +350,7 @@ async function playIndex(index) {
   amplitudeAverage = 0;
   coreBreath = 0;
   coreTargetBreath = 0;
+  auraBreath = 0;
   calmWindow = 0;
   scytheEvents = [];
   starParticles = [];
@@ -701,7 +703,7 @@ function updateAudioEnergy() {
   audioAmplitude = audioAmplitude * 0.82 + peak * 0.18;
   amplitudeAverage = amplitudeAverage * 0.992 + audioAmplitude * 0.008;
   const overAverage = Math.max(0, audioAmplitude - Math.max(0.08, amplitudeAverage * 0.92));
-  coreTargetBreath = Math.min(1.15, Math.pow(Math.max(0, overAverage) * 2.2 + positiveRise * 4.8, 0.72));
+  coreTargetBreath = Math.min(1.45, Math.pow(Math.max(0, overAverage) * 2.85 + positiveRise * 6.2, 0.68));
 
   if (drive < Math.max(0.08, driveAverage * 0.7) && audioAmplitude < Math.max(0.12, amplitudeAverage * 0.82)) {
     calmWindow = Math.min(1.6, calmWindow + 0.032);
@@ -719,13 +721,13 @@ function updateAudioEnergy() {
 }
 
 function updateLogoAmplitudes(now, elapsed) {
-  const decayFactor = elapsed * 0.00145;
+  const decayFactor = elapsed * 0.00092;
   for (let i = 0; i < visualizerBars.length; i += 1) {
     visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
   }
 
-  if (!freqData || audio.paused || now - lastVisualizerUpdate < 70) return;
+  if (!freqData || audio.paused || now - lastVisualizerUpdate < 85) return;
   lastVisualizerUpdate = now;
 
   const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.62;
@@ -736,8 +738,10 @@ function updateLogoAmplitudes(now, elapsed) {
     const raw = (freqData[sourceIndex] || 0) / 255;
     const normalised = Math.max(0, raw - 0.018) / dynamicRange;
     const compressed = 1 - Math.exp(-normalised * 0.72);
-    const target = Math.min(0.3, compressed * 0.23 * kiaiMultiplier * userScale);
-    if (target > visualizerBars[i]) visualizerBars[i] = Math.min(0.52, target);
+    const target = Math.min(0.42, compressed * 0.32 * kiaiMultiplier * userScale);
+    if (target > visualizerBars[i]) {
+      visualizerBars[i] += (target - visualizerBars[i]) * 0.42;
+    }
   }
   visualizerOffset = (visualizerOffset + 3) % visualizerBars.length;
 }
@@ -764,24 +768,26 @@ function spawnBurst(count = 10) {
 
 function spawnRipple(power = 0.6, reason = 'beat') {
   const now = performance.now();
-  if (now - lastRippleAt < 120) return;
+  if (now - lastRippleAt < 140) return;
   lastRippleAt = now;
   rippleRings.push({
     start: now,
-    duration: 720 + power * 320,
+    duration: 980 + power * 430,
     power,
     reason,
   });
-  rippleRings = rippleRings.slice(-12);
+  rippleRings = rippleRings.slice(-16);
 }
 
 function maybeTriggerStarFountain(power = 1, reason = 'kiai') {
   const trackTime = audio.currentTime || 0;
-  const suddenReturn = calmWindow > 0.44 && currentRise > Math.max(0.065, riseAverage * 2.35) && currentDrive > Math.max(0.28, driveAverage + 0.11);
+  const activeLift = currentDrive > Math.max(0.27, driveAverage + 0.075);
+  const meaningfulRise = currentRise > Math.max(0.045, riseAverage * 1.85);
+  const suddenReturn = calmWindow > 0.28 && meaningfulRise && currentDrive > Math.max(0.25, driveAverage + 0.075);
   const afterIntro = trackTime >= 10;
-  const earlyException = trackTime >= 6 && calmWindow > 0.95 && suddenReturn && currentDrive > 0.42;
-  const kiaiCut = reason === 'kiai-start' && (suddenReturn || currentDrive > Math.max(0.34, driveAverage + 0.16));
-  const strongCut = reason !== 'kiai-start' && suddenReturn;
+  const earlyException = trackTime >= 6 && calmWindow > 0.75 && suddenReturn && currentDrive > 0.36;
+  const kiaiCut = reason === 'kiai-start' && (suddenReturn || activeLift || meaningfulRise);
+  const strongCut = reason !== 'kiai-start' && (suddenReturn || (activeEffectPoint?.kiai && activeLift) || (meaningfulRise && currentDrive > 0.36));
 
   if ((!afterIntro && !earlyException) || (!kiaiCut && !strongCut)) return;
   triggerStarFountain(power * (suddenReturn ? 1.15 : 0.86), reason);
@@ -790,7 +796,7 @@ function maybeTriggerStarFountain(power = 1, reason = 'kiai') {
 function triggerStarFountain(power = 1, reason = 'kiai') {
   if (settings.fountain <= 0.02) return;
   const now = performance.now();
-  const cooldown = reason === 'kiai-start' ? 1800 : 2800 - settings.fountain * 460;
+  const cooldown = reason === 'kiai-start' ? 1500 : 2200 - settings.fountain * 360;
   if (now - lastFountainAt < cooldown) return;
   lastFountainAt = now;
 
@@ -894,18 +900,24 @@ function drawRippleRings(cx, cy, coreSize, now) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.lineCap = 'round';
+  ctx.globalCompositeOperation = 'lighter';
   for (const ring of rippleRings) {
     const progress = Math.max(0, Math.min(1, (now - ring.start) / ring.duration));
-    const eased = 1 - Math.pow(1 - progress, 2.6);
-    const radius = coreSize * (0.5 + eased * (0.34 + ring.power * 0.12));
-    const alpha = (1 - progress) * (0.16 + ring.power * 0.12);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.lineWidth = Math.max(2, coreSize * 0.008 * (1 - progress * 0.45));
-    ctx.shadowColor = `rgba(255, 130, 210, ${alpha * 0.7})`;
-    ctx.shadowBlur = 18 + ring.power * 18;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.stroke();
+    const eased = 1 - Math.pow(1 - progress, 2.15);
+    const baseRadius = coreSize * (0.48 + eased * (0.46 + ring.power * 0.12));
+    const fade = Math.pow(1 - progress, 1.25);
+    for (let i = 0; i < 3; i += 1) {
+      const offset = i * coreSize * 0.032;
+      const radius = baseRadius + offset;
+      const alpha = fade * (0.05 + ring.power * 0.052) * (1 - i * 0.27);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.lineWidth = Math.max(8, coreSize * (0.032 - i * 0.004)) * (1 - progress * 0.18);
+      ctx.shadowColor = `rgba(255, 130, 210, ${alpha})`;
+      ctx.shadowBlur = 24 + ring.power * 26;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
   ctx.restore();
   rippleRings = rippleRings.filter((ring) => now - ring.start < ring.duration);
@@ -949,6 +961,7 @@ function draw() {
   lightEnergy *= Math.exp(-elapsed / 420);
   lightSweep *= Math.exp(-elapsed / 260);
   coreBreath += (coreTargetBreath - coreBreath) * Math.min(1, elapsed / 180);
+  auraBreath += (coreBreath - auraBreath) * Math.min(1, elapsed / 680);
   coreTargetBreath *= Math.exp(-elapsed / 420);
   const leftSoft = envelopeValue(sideEnvelopes.leftSoft, now);
   const rightSoft = envelopeValue(sideEnvelopes.rightSoft, now);
@@ -978,7 +991,7 @@ function draw() {
   coreFollowX += (targetFollowX - coreFollowX) * Math.min(1, elapsed / 120);
   coreFollowY += (targetFollowY - coreFollowY) * Math.min(1, elapsed / 120);
   const hoverBoost = coreHover ? 0.045 : 0;
-  const coreScale = 1 + (coreBreath * 0.058 + energy * 0.035 + timingPulse * 0.008) * settings.pulse + hoverBoost + earlyDip;
+  const coreScale = 1 + (coreBreath * 0.092 + energy * 0.045 + timingPulse * 0.006) * settings.pulse + hoverBoost + earlyDip;
   debugScaleMin = Math.min(debugScaleMin, coreScale);
   debugScaleMax = Math.max(debugScaleMax, coreScale);
   window.__visualDebug = {
@@ -999,6 +1012,7 @@ function draw() {
     beatAccent,
     coreFlash,
     coreBreath,
+    auraBreath,
     audioAmplitude,
     amplitudeAverage,
     calmWindow,
@@ -1012,13 +1026,14 @@ function draw() {
   };
   core.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale})`;
   if (coreAura) {
-    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${0.96 + coreBreath * 0.1})`;
+    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${0.96 + auraBreath * 0.14})`;
   }
   core.style.boxShadow = `0 0 ${54 + energy * 170 + coreFlash * 80}px rgba(255, 72, 169, ${Math.min(0.9, 0.34 + energy * 0.5 + coreFlash * 0.22)})`;
 
   document.documentElement.style.setProperty('--energy', energy.toFixed(3));
   document.documentElement.style.setProperty('--core-flash', Math.min(1, coreFlash).toFixed(3));
   document.documentElement.style.setProperty('--core-breath', Math.min(1.2, coreBreath).toFixed(3));
+  document.documentElement.style.setProperty('--aura-breath', Math.min(1.2, auraBreath).toFixed(3));
   const visualLight = Math.max(lightEnergy, sectionHeat * 0.12);
   document.documentElement.style.setProperty('--light', Math.min(1.25, visualLight).toFixed(3));
   document.documentElement.style.setProperty('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(3));
@@ -1064,32 +1079,39 @@ function drawLogoVisualizer(cx, cy, energy) {
   const bars = visualizerBars.length;
   const visualiserRounds = 5;
   const coreSize = core.getBoundingClientRect().width || Math.min(window.innerWidth, window.innerHeight) * 0.4;
-  const baseRadius = coreSize * 0.51;
-  const maxBarLength = coreSize * 0.38;
-  const barWidth = Math.max(3.2, (Math.PI * 2 * baseRadius) / bars * 0.68);
+  const baseRadius = coreSize * 0.472;
+  const maxBarLength = coreSize * 0.58;
+  const barWidth = Math.max(5.2, (Math.PI * 2 * coreSize * 0.5) / bars * 0.86);
   const deadZone = 1 / Math.max(1, maxBarLength);
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(performance.now() / 23000);
   ctx.lineCap = 'round';
-  for (let round = 0; round < visualiserRounds; round += 1) {
-    const roundOffset = (round * Math.PI * 2) / visualiserRounds;
-    for (let i = 0; i < bars; i += 1) {
-      const amplitude = visualizerBars[i];
-      if (amplitude <= deadZone && energy < 0.04) continue;
-      const angle = (i / bars) * Math.PI * 2 + roundOffset;
-      const length = Math.max(2.5, amplitude * maxBarLength + Math.min(5, energy * 3));
-      const r1 = baseRadius + 9;
-      const r2 = r1 + length;
-      const alpha = Math.min(0.34, 0.035 + amplitude * 0.9 + energy * 0.035);
-      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-      ctx.lineWidth = barWidth;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
-      ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
-      ctx.stroke();
+
+  const drawLayer = (angleOffset, alphaScale, lengthScale, widthScale, colour) => {
+    for (let round = 0; round < visualiserRounds; round += 1) {
+      const roundOffset = angleOffset + (round * Math.PI * 2) / visualiserRounds;
+      for (let i = 0; i < bars; i += 1) {
+        const amplitude = visualizerBars[i];
+        if (amplitude <= deadZone && energy < 0.04) continue;
+        const angle = (i / bars) * Math.PI * 2 + roundOffset;
+        const length = Math.max(4, amplitude * maxBarLength * lengthScale + Math.min(7, energy * 4));
+        const r1 = baseRadius;
+        const r2 = r1 + length;
+        const alpha = Math.min(0.38, (0.032 + amplitude * 0.8 + energy * 0.03) * alphaScale);
+        ctx.strokeStyle = colour(alpha);
+        ctx.lineWidth = barWidth * widthScale;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
+        ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
+        ctx.stroke();
+      }
     }
-  }
+  };
+
+  ctx.rotate(performance.now() / 27000);
+  drawLayer(0, 0.58, 1.08, 1.45, (alpha) => `rgba(255, 92, 188, ${alpha})`);
+  drawLayer(Math.PI / 2, 0.88, 0.92, 0.95, (alpha) => `rgba(255, 255, 255, ${alpha})`);
+
   ctx.restore();
 }
 
