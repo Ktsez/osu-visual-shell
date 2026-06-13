@@ -5,13 +5,14 @@ import { extname, join, resolve, sep } from 'node:path';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { parseOsuFile } from './src/server/parseOsuFile.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const port = Number(process.env.PORT || 4173);
+const host = process.env.HOST || '127.0.0.1';
 const media = new Map();
 
 const audioExts = new Set(['.mp3', '.ogg', '.wav', '.flac', '.m4a', '.aac', '.opus']);
-const imageExts = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp']);
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -40,78 +41,6 @@ function mediaId(filePath) {
   const id = createHash('sha1').update(filePath).digest('hex').slice(0, 16);
   media.set(id, filePath);
   return `/media/${id}`;
-}
-
-function splitLines(text) {
-  return text.replace(/^\uFEFF/, '').split(/\r?\n/);
-}
-
-function parseOsuFile(text, baseDir) {
-  const result = {
-    title: 'Unknown title',
-    artist: 'Unknown artist',
-    creator: '',
-    version: '',
-    audio: '',
-    background: '',
-    timingPoints: [],
-  };
-  let section = '';
-
-  for (const rawLine of splitLines(text)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('//')) continue;
-    const sectionMatch = line.match(/^\[(.+)]$/);
-    if (sectionMatch) {
-      section = sectionMatch[1];
-      continue;
-    }
-
-    if (section === 'General') {
-      const [key, ...valueParts] = line.split(':');
-      const value = valueParts.join(':').trim();
-      if (key === 'AudioFilename') result.audio = join(baseDir, value);
-    }
-
-    if (section === 'Metadata') {
-      const [key, ...valueParts] = line.split(':');
-      const value = valueParts.join(':').trim();
-      if (key === 'Title' || key === 'TitleUnicode') result.title = value || result.title;
-      if (key === 'Artist' || key === 'ArtistUnicode') result.artist = value || result.artist;
-      if (key === 'Creator') result.creator = value;
-      if (key === 'Version') result.version = value;
-    }
-
-    if (section === 'Events' && line.includes(',')) {
-      const parts = line.split(',').map((part) => part.trim().replace(/^"|"$/g, ''));
-      if ((parts[0] === '0' || parts[0] === 'Video') && parts[2]) {
-        const candidate = join(baseDir, parts[2]);
-        if (imageExts.has(extname(candidate).toLowerCase())) result.background = candidate;
-      }
-    }
-
-    if (section === 'TimingPoints') {
-      const parts = line.split(',');
-      const offset = Number(parts[0]);
-      const beatLength = Number(parts[1]);
-      const meter = Number(parts[2] || 4);
-      const effects = Number(parts[7] || 0);
-      const uninherited = parts.length < 7 ? true : parts[6] === '1';
-      if (Number.isFinite(offset) && Number.isFinite(beatLength)) {
-        result.timingPoints.push({
-          offset,
-          beatLength,
-          meter,
-          uninherited,
-          effects: Number.isFinite(effects) ? effects : 0,
-          kiai: Number.isFinite(effects) ? (effects & 1) === 1 : false,
-        });
-      }
-    }
-  }
-
-  result.timingPoints.sort((a, b) => a.offset - b.offset);
-  return result;
 }
 
 async function scanOsuSongs(songsPath) {
@@ -293,6 +222,6 @@ createServer(async (req, res) => {
   } catch (error) {
     json(res, { error: error instanceof Error ? error.message : 'unknown error' }, 500);
   }
-}).listen(port, () => {
-  console.log(`osu visual shell running at http://localhost:${port}`);
+}).listen(port, host, () => {
+  console.log(`osu visual shell running at http://${host}:${port}`);
 });

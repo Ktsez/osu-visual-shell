@@ -52,6 +52,14 @@ npm run dev
 http://localhost:4173/scythe-preview.html
 ```
 
+默认情况下，本地服务只监听 `127.0.0.1`，不会暴露到局域网。如果明确需要让同一局域网内的其他设备访问，可以手动设置：
+
+```bash
+HOST=0.0.0.0 npm start
+```
+
+只在你理解局域网访问风险并确实需要时使用这个设置。
+
 ### 使用方式
 
 1. 打开本地页面。
@@ -87,6 +95,40 @@ http://localhost:4173/scythe-preview.html
 这个项目不会搬运 osu! 的游戏功能，也不会内置任何 osu! 官方资源、谱面、音乐或第三方音乐服务内容。它只读取用户本机已经存在的音乐文件和谱面文件。
 
 如果读取 osu! Songs 文件夹，音乐和背景图来自用户电脑本地已经拥有的谱面目录。请确保你拥有对应文件的使用权。
+
+### Preview
+
+预览图片路径已预留，后续可以替换为真实截图：
+
+![Main view](docs/screenshots/main.png)
+![Settings panel](docs/screenshots/settings.png)
+
+如果这些图片暂时不存在，README 中的引用只是占位，不代表仓库已经包含截图文件。
+
+### 隐私说明
+
+- 本项目在本地运行。
+- 默认只监听 `127.0.0.1`。
+- 只读取用户主动选择或填写的本地文件夹。
+- 不上传音乐、谱面、背景图或 metadata。
+- 只有手动设置 `HOST=0.0.0.0` 时，才会允许局域网访问。
+
+### Roadmap
+
+- [ ] Refactor frontend into modules
+- [ ] Add parser tests for .osu files
+- [ ] Add desktop packaging
+- [ ] Add drag-and-drop folder selection
+- [ ] Add visual preset system
+- [ ] Add FPS/performance panel
+- [ ] Add screenshot / GIF preview
+
+### Known Issues
+
+- 大型 osu! Songs 文件夹扫描可能需要一些时间。
+- 目前仍需要手动输入或自动检测本地路径。
+- 浏览器可能需要用户点击后才允许播放音频。
+- 当前项目不是 osu! 客户端，不支持游戏模式。
 
 ### 开源协议
 
@@ -155,6 +197,14 @@ Side-light preview page:
 http://localhost:4173/scythe-preview.html
 ```
 
+By default, the local server listens on `127.0.0.1` only and is not exposed to your LAN. If you explicitly need access from another device on the same network, run:
+
+```bash
+HOST=0.0.0.0 npm start
+```
+
+Use this only when you understand the LAN exposure tradeoff and actually need it.
+
 ### How to Use
 
 1. Open the local page.
@@ -190,6 +240,40 @@ http://localhost:4173/scythe-preview.html
 This project does not copy osu! gameplay features, official osu! assets, beatmaps, songs, or third-party music service content. It only reads files that already exist on the user's local computer.
 
 When scanning an osu! Songs folder, music and background images are loaded from the user's existing local beatmap directories. Please make sure you have the right to use those files.
+
+### Preview
+
+Preview image paths are reserved for future real screenshots:
+
+![Main view](docs/screenshots/main.png)
+![Settings panel](docs/screenshots/settings.png)
+
+If these files do not exist yet, the links are placeholders only.
+
+### Privacy
+
+- The project runs locally.
+- The server listens on `127.0.0.1` by default.
+- It only reads local folders that the user explicitly selects or enters.
+- It does not upload music, beatmaps, background images, or metadata.
+- LAN access is enabled only when `HOST=0.0.0.0` is set manually.
+
+### Roadmap
+
+- [ ] Refactor frontend into modules
+- [ ] Add parser tests for .osu files
+- [ ] Add desktop packaging
+- [ ] Add drag-and-drop folder selection
+- [ ] Add visual preset system
+- [ ] Add FPS/performance panel
+- [ ] Add screenshot / GIF preview
+
+### Known Issues
+
+- Large osu! Songs folders can take time to scan.
+- Local paths still need to be entered manually or detected automatically.
+- Browsers may require a user click before audio playback is allowed.
+- This is not an osu! client and does not support gameplay modes.
 
 ### License
 
