@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-star-glow-ghost-settings';
+window.__appVersion = '20260613-surface-ghost-star-glow';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -114,18 +114,19 @@ const hollowStarPath = createStarPath(0.58);
 const defaultSettings = {
   sideIntensity: 1,
   sideRestraint: 1,
-  pulse: 1.8,
-  ghostIntensity: 1.6,
-  ghostSize: 1.18,
-  ghostLag: 1.35,
-  ghostBlur: 1,
+  pulse: 1.6,
+  ghostIntensity: 0.8,
+  ghostSize: 1,
+  ghostLag: 0.1,
+  ghostBlur: 0.1,
   visualizer: 5.4,
-  visualizerRange: 3,
+  visualizerRange: 2.6,
   visualizerContrast: 1.2,
   visualizerDecay: 1.3,
   waveSize: 0.8,
   waveIntensity: 2,
   fountain: 1.6,
+  starGlow: 0.45,
   fountainSensitivity: 3.1,
 };
 const settings = { ...defaultSettings };
@@ -133,7 +134,7 @@ const settings = { ...defaultSettings };
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v6';
+const settingsKey = 'osu-visual-shell-settings-v7';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -168,8 +169,9 @@ function clampSettingValue(key, value) {
   return Math.min(max, Math.max(min, numeric));
 }
 
-function formatSettingValue(value) {
-  return Number(value).toFixed(1);
+function formatSettingValue(key, value) {
+  const precision = Number(settingsNumberInputs[key]?.dataset.precision ?? 1);
+  return Number(value).toFixed(precision);
 }
 
 function writeSettingInputs(key, options = {}) {
@@ -177,7 +179,7 @@ function writeSettingInputs(key, options = {}) {
   settings[key] = value;
   if (settingsInputs[key]) settingsInputs[key].value = String(value);
   if (settingsNumberInputs[key]) {
-    settingsNumberInputs[key].value = options.preserveNumberInput ? String(value) : formatSettingValue(value);
+    settingsNumberInputs[key].value = options.preserveNumberInput ? String(value) : formatSettingValue(key, value);
   }
 }
 
@@ -375,11 +377,6 @@ async function playIndex(index) {
   background.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   cover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   coreCover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
-  if (coreAura) {
-    coreAura.style.backgroundImage = track.backgroundUrl
-      ? `radial-gradient(circle, rgba(255, 255, 255, 0.12) 0 35%, transparent 62%), url("${track.backgroundUrl}")`
-      : '';
-  }
   trackTitle.textContent = track.title;
   trackMeta.textContent = `${track.artist}${track.version ? ` / ${track.version}` : ''}`;
   coreSubtitle.textContent = track.timingPoints?.length ? '节拍同步' : '音频同步';
@@ -1155,7 +1152,8 @@ function draw() {
   core.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale})`;
   if (coreAura) {
     const ghostSize = Math.max(0.2, settings.ghostSize || 1.18);
-    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreGhostScale * ghostSize * (1.025 + auraBreath * 0.12)})`;
+    const relativeGhostScale = Math.max(0.2, (coreGhostScale / Math.max(0.2, coreScale)) * ghostSize * (1.025 + auraBreath * 0.12));
+    coreAura.style.transform = `scale(${relativeGhostScale})`;
   }
   core.style.boxShadow = `0 0 ${54 + energy * 170 + coreFlash * 80}px rgba(255, 72, 169, ${Math.min(0.9, 0.34 + energy * 0.5 + coreFlash * 0.22)})`;
 
@@ -1198,9 +1196,10 @@ function draw() {
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
+  const starGlow = Math.max(0, settings.starGlow || 0);
   for (const particle of starParticles) {
     const progress = particle.age / particle.duration;
-    const alpha = Math.max(0, (1 - progress) * 0.28);
+    const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
     drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
   }
   ctx.restore();

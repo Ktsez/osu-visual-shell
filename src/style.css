@@ -127,26 +127,23 @@ button:hover,
 }
 
 .core-aura {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: clamp(500px, 70vmin, 830px);
-  aspect-ratio: 1;
+  position: absolute;
+  inset: 6px;
   border-radius: 50%;
   pointer-events: none;
-  z-index: 3;
+  z-index: 2;
   opacity: calc((0.18 + var(--aura-breath) * 0.3 + var(--core-flash) * 0.13) * var(--ghost-intensity));
   background:
-    radial-gradient(circle, rgba(255, 255, 255, calc(0.08 + var(--core-flash) * 0.16)) 0 34%, transparent 54%),
-    radial-gradient(circle, rgba(255, 90, 185, calc(0.24 + var(--aura-breath) * 0.24)) 0 44%, transparent 70%);
+    radial-gradient(circle, transparent 0 50%, rgba(255, 255, 255, calc(0.12 + var(--core-flash) * 0.16)) 53%, transparent 61%),
+    radial-gradient(circle, transparent 0 58%, rgba(255, 90, 185, calc(0.18 + var(--aura-breath) * 0.2)) 63%, transparent 76%);
   background-position: center;
   background-size: cover;
   box-shadow:
-    0 0 calc((34px + var(--aura-breath) * 72px) * var(--ghost-intensity)) rgba(255, 90, 185, calc(0.16 + var(--aura-breath) * 0.24)),
-    inset 0 0 42px rgba(255, 255, 255, calc(0.06 + var(--core-flash) * 0.12));
-  filter: blur(calc((4px + var(--aura-breath) * 9px) * var(--ghost-blur))) saturate(1.12);
+    0 0 calc((18px + var(--aura-breath) * 42px) * var(--ghost-intensity)) rgba(255, 90, 185, calc(0.14 + var(--aura-breath) * 0.18)),
+    inset 0 0 calc(18px + var(--core-flash) * 24px) rgba(255, 255, 255, calc(0.08 + var(--core-flash) * 0.1));
+  filter: blur(calc((2px + var(--aura-breath) * 5px) * var(--ghost-blur))) saturate(1.08);
   mix-blend-mode: screen;
-  transform: translate(-50%, -50%) scale(calc(0.96 + var(--core-breath) * 0.1));
+  transform: scale(calc(0.96 + var(--core-breath) * 0.1));
   will-change: transform, opacity, filter;
 }
 

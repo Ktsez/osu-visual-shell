@@ -25,8 +25,8 @@
         <div class="halo halo-a"></div>
         <div class="halo halo-b"></div>
 
-        <div id="core-aura" class="core-aura" aria-hidden="true"></div>
         <div id="core" class="core" role="button" tabindex="0" aria-label="打开音乐控制">
+          <span id="core-aura" class="core-aura" aria-hidden="true"></span>
           <span class="core-pulse-glow"></span>
           <span id="core-cover" class="core-cover"></span>
           <span id="core-subtitle" class="core-subtitle">点击打开</span>
@@ -117,36 +117,36 @@
           <label>
             <span>圆盘律动</span>
             <div class="setting-control">
-              <input id="setting-pulse" data-setting="pulse" type="range" min="-1.2" max="4.8" step="0.05" value="1.8" />
-              <input class="setting-number" data-setting-number="pulse" type="number" min="-1.2" max="4.8" step="0.1" value="1.8" />
+              <input id="setting-pulse" data-setting="pulse" type="range" min="-1.4" max="4.6" step="0.05" value="1.6" />
+              <input class="setting-number" data-setting-number="pulse" type="number" min="-1.4" max="4.6" step="0.1" value="1.6" />
             </div>
           </label>
           <label>
             <span>圆盘留影强度</span>
             <div class="setting-control">
-              <input id="setting-ghost-intensity" data-setting="ghostIntensity" type="range" min="0" max="4" step="0.05" value="1.6" />
-              <input class="setting-number" data-setting-number="ghostIntensity" type="number" min="0" max="4" step="0.1" value="1.6" />
+              <input id="setting-ghost-intensity" data-setting="ghostIntensity" type="range" min="0" max="4" step="0.05" value="0.8" />
+              <input class="setting-number" data-setting-number="ghostIntensity" type="number" min="0" max="4" step="0.1" value="0.8" />
             </div>
           </label>
           <label>
             <span>圆盘留影大小</span>
             <div class="setting-control">
-              <input id="setting-ghost-size" data-setting="ghostSize" type="range" min="0.6" max="2.4" step="0.05" value="1.18" />
-              <input class="setting-number" data-setting-number="ghostSize" type="number" min="0.6" max="2.4" step="0.1" value="1.2" />
+              <input id="setting-ghost-size" data-setting="ghostSize" type="range" min="0.7" max="1.3" step="0.01" value="1" />
+              <input class="setting-number" data-setting-number="ghostSize" type="number" min="0.7" max="1.3" step="0.01" value="1.00" data-precision="2" />
             </div>
           </label>
           <label>
             <span>圆盘留影延迟</span>
             <div class="setting-control">
-              <input id="setting-ghost-lag" data-setting="ghostLag" type="range" min="0.1" max="2.4" step="0.05" value="1.35" />
-              <input class="setting-number" data-setting-number="ghostLag" type="number" min="0.1" max="2.4" step="0.1" value="1.4" />
+              <input id="setting-ghost-lag" data-setting="ghostLag" type="range" min="0.05" max="3.1" step="0.05" value="0.1" />
+              <input class="setting-number" data-setting-number="ghostLag" type="number" min="0.05" max="3.1" step="0.1" value="0.1" />
             </div>
           </label>
           <label>
             <span>圆盘留影虚化</span>
             <div class="setting-control">
-              <input id="setting-ghost-blur" data-setting="ghostBlur" type="range" min="0" max="2.5" step="0.05" value="1" />
-              <input class="setting-number" data-setting-number="ghostBlur" type="number" min="0" max="2.5" step="0.1" value="1.0" />
+              <input id="setting-ghost-blur" data-setting="ghostBlur" type="range" min="0" max="3.1" step="0.05" value="0.1" />
+              <input class="setting-number" data-setting-number="ghostBlur" type="number" min="0" max="3.1" step="0.1" value="0.1" />
             </div>
           </label>
           <label>
@@ -159,8 +159,8 @@
           <label>
             <span>能量柱范围</span>
             <div class="setting-control">
-              <input id="setting-visualizer-range" data-setting="visualizerRange" type="range" min="0" max="6" step="0.05" value="3" />
-              <input class="setting-number" data-setting-number="visualizerRange" type="number" min="0" max="6" step="0.1" value="3.0" />
+              <input id="setting-visualizer-range" data-setting="visualizerRange" type="range" min="-0.4" max="5.6" step="0.05" value="2.6" />
+              <input class="setting-number" data-setting-number="visualizerRange" type="number" min="-0.4" max="5.6" step="0.1" value="2.6" />
             </div>
           </label>
           <label>
@@ -199,6 +199,13 @@
             </div>
           </label>
           <label>
+            <span>星星光晕</span>
+            <div class="setting-control">
+              <input id="setting-star-glow" data-setting="starGlow" type="range" min="0" max="2" step="0.05" value="0.45" />
+              <input class="setting-number" data-setting-number="starGlow" type="number" min="0" max="2" step="0.1" value="0.5" />
+            </div>
+          </label>
+          <label>
             <span>喷泉灵敏度</span>
             <div class="setting-control">
               <input id="setting-fountain-sensitivity" data-setting="fountainSensitivity" type="range" min="0.1" max="6.1" step="0.05" value="3.1" />
@@ -211,6 +218,6 @@
     </main>
 
     <audio id="audio" crossorigin="anonymous"></audio>
-    <script type="module" src="/src/main.js?v=20260613-star-glow-ghost-settings"></script>
+    <script type="module" src="/src/main.js?v=20260613-surface-ghost-star-glow"></script>
   </body>
 </html>
