@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-restore-canvas-effects';
+window.__appVersion = '20260613-screenshot-defaults';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -119,8 +119,8 @@ const defaultSettings = {
   sideIntensity: 1,
   sideRestraint: 1,
   pulse: 1.6,
-  coreGlow: 1,
-  coreGlowColor: '#ff48a9',
+  coreGlow: 0.6,
+  coreGlowColor: '#ffffff',
   ghostIntensity: 0.8,
   ghostSize: 0,
   ghostLag: 0.1,
@@ -132,7 +132,7 @@ const defaultSettings = {
   waveSize: 0.8,
   waveIntensity: 2,
   fountain: 1.6,
-  starGlow: 0.45,
+  starGlow: 0.5,
   fountainSensitivity: 3.1,
 };
 const settings = { ...defaultSettings };
@@ -140,7 +140,7 @@ const settings = { ...defaultSettings };
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v9';
+const settingsKey = 'osu-visual-shell-settings-v10';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
