@@ -122,6 +122,20 @@
             </div>
           </label>
           <label>
+            <span>圆盘光晕强度</span>
+            <div class="setting-control">
+              <input id="setting-core-glow" data-setting="coreGlow" type="range" min="0" max="3" step="0.05" value="1" />
+              <input class="setting-number" data-setting-number="coreGlow" type="number" min="0" max="3" step="0.1" value="1.0" />
+            </div>
+          </label>
+          <label>
+            <span>圆盘光晕颜色</span>
+            <div class="setting-control">
+              <input id="setting-core-glow-color" class="setting-color" data-setting-color="coreGlowColor" type="color" value="#ff48a9" />
+              <span class="setting-color-value" data-setting-color-value="coreGlowColor">#ff48a9</span>
+            </div>
+          </label>
+          <label>
             <span>圆盘留影强度</span>
             <div class="setting-control">
               <input id="setting-ghost-intensity" data-setting="ghostIntensity" type="range" min="0" max="4" step="0.05" value="0.8" />
@@ -131,8 +145,8 @@
           <label>
             <span>圆盘留影大小</span>
             <div class="setting-control">
-              <input id="setting-ghost-size" data-setting="ghostSize" type="range" min="0.7" max="1.3" step="0.01" value="1" />
-              <input class="setting-number" data-setting-number="ghostSize" type="number" min="0.7" max="1.3" step="0.01" value="1.00" data-precision="2" />
+              <input id="setting-ghost-size" data-setting="ghostSize" type="range" min="-2" max="4" step="0.01" value="1" />
+              <input class="setting-number" data-setting-number="ghostSize" type="number" min="-2" max="4" step="0.01" value="1.00" data-precision="2" />
             </div>
           </label>
           <label>
@@ -218,6 +232,6 @@
     </main>
 
     <audio id="audio" crossorigin="anonymous"></audio>
-    <script type="module" src="/src/main.js?v=20260613-surface-ghost-star-glow"></script>
+    <script type="module" src="/src/main.js?v=20260613-glow-controls-perf-pass"></script>
   </body>
 </html>

@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-surface-ghost-star-glow';
+window.__appVersion = '20260613-glow-controls-perf-pass';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -29,6 +29,8 @@ const songCount = document.querySelector('#song-count');
 const minimizeControls = document.querySelector('#minimize-controls');
 const settingsInputs = Object.fromEntries([...document.querySelectorAll('[data-setting]')].map((input) => [input.dataset.setting, input]));
 const settingsNumberInputs = Object.fromEntries([...document.querySelectorAll('[data-setting-number]')].map((input) => [input.dataset.settingNumber, input]));
+const settingsColorInputs = Object.fromEntries([...document.querySelectorAll('[data-setting-color]')].map((input) => [input.dataset.settingColor, input]));
+const settingsColorValues = Object.fromEntries([...document.querySelectorAll('[data-setting-color-value]')].map((item) => [item.dataset.settingColorValue, item]));
 const resetSettingsButton = document.querySelector('#reset-settings');
 
 let tracks = [];
@@ -104,6 +106,9 @@ let coreGhostScale = 1;
 let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
 let lastAudioFountainAt = -10000;
+let visualizerActiveCount = 0;
+const cssVarCache = new Map();
+const textCache = new WeakMap();
 
 const visualizerBars = new Float32Array(200);
 const previousVisualizerBins = new Float32Array(200);
@@ -115,6 +120,8 @@ const defaultSettings = {
   sideIntensity: 1,
   sideRestraint: 1,
   pulse: 1.6,
+  coreGlow: 1,
+  coreGlowColor: '#ff48a9',
   ghostIntensity: 0.8,
   ghostSize: 1,
   ghostLag: 0.1,
@@ -134,7 +141,7 @@ const settings = { ...defaultSettings };
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v7';
+const settingsKey = 'osu-visual-shell-settings-v8';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -175,6 +182,7 @@ function formatSettingValue(key, value) {
 }
 
 function writeSettingInputs(key, options = {}) {
+  if (!settingsInputs[key] && !settingsNumberInputs[key]) return;
   const value = clampSettingValue(key, settings[key]);
   settings[key] = value;
   if (settingsInputs[key]) settingsInputs[key].value = String(value);
@@ -188,6 +196,46 @@ function persistSetting(key, value, options = {}) {
   writeSettingInputs(key, options);
   localStorage.setItem(settingsKey, JSON.stringify(settings));
   touch('settings');
+}
+
+function normaliseHexColour(value, fallback = '#ff48a9') {
+  const text = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(text) ? text.toLowerCase() : fallback;
+}
+
+function hexToRgb(value) {
+  const hex = normaliseHexColour(value).slice(1);
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16),
+  };
+}
+
+function writeColourInput(key) {
+  const value = normaliseHexColour(settings[key], defaultSettings[key]);
+  settings[key] = value;
+  if (settingsColorInputs[key]) settingsColorInputs[key].value = value;
+  if (settingsColorValues[key]) settingsColorValues[key].textContent = value;
+}
+
+function persistColourSetting(key, value) {
+  settings[key] = normaliseHexColour(value, defaultSettings[key]);
+  writeColourInput(key);
+  localStorage.setItem(settingsKey, JSON.stringify(settings));
+  touch('settings');
+}
+
+function setCssVar(name, value) {
+  if (cssVarCache.get(name) === value) return;
+  cssVarCache.set(name, value);
+  document.documentElement.style.setProperty(name, value);
+}
+
+function setText(node, value) {
+  if (!node || textCache.get(node) === value) return;
+  textCache.set(node, value);
+  node.textContent = value;
 }
 
 function loadSettings() {
@@ -211,10 +259,17 @@ function loadSettings() {
     input.addEventListener('change', () => persistSetting(key, input.value));
   }
 
+  for (const [key, input] of Object.entries(settingsColorInputs)) {
+    if (!input) continue;
+    writeColourInput(key);
+    input.addEventListener('input', () => persistColourSetting(key, input.value));
+  }
+
   resetSettingsButton?.addEventListener('click', () => {
     Object.assign(settings, defaultSettings);
     localStorage.setItem(settingsKey, JSON.stringify(settings));
-    Object.keys(defaultSettings).forEach(writeSettingInputs);
+    Object.keys(settingsInputs).forEach(writeSettingInputs);
+    Object.keys(settingsColorInputs).forEach(writeColourInput);
     touch('settings');
   });
 }
@@ -786,12 +841,14 @@ function updateAudioEnergy() {
 
 function updateLogoAmplitudes(now, elapsed) {
   const decayFactor = elapsed * 0.0024 * Math.max(0.05, settings.visualizerDecay);
+  visualizerActiveCount = 0;
   for (let i = 0; i < visualizerBars.length; i += 1) {
     visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
+    if (visualizerBars[i] > 0.01) visualizerActiveCount += 1;
   }
 
-  if (!freqData || audio.paused || now - lastVisualizerUpdate < 50) return;
+  if (!freqData || audio.paused || now - lastVisualizerUpdate < 32) return;
   lastVisualizerUpdate = now;
 
   const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
@@ -826,6 +883,7 @@ function updateLogoAmplitudes(now, elapsed) {
     .slice(0, activeEffectPoint?.kiai ? 34 : 24)
     .forEach(({ index, target }) => {
       visualizerBars[index] = Math.min(target, visualizerBars[index] + attackLimit);
+      if (visualizerBars[index] > 0.01) visualizerActiveCount += 1;
     });
 
   for (let i = 1; i < visualizerBars.length - 1; i += 1) {
@@ -1056,9 +1114,10 @@ function updateProgress() {
   const duration = audio.duration || 0;
   const current = audio.currentTime || 0;
   if (!draggingProgress && duration) progress.value = String(Math.round((current / duration) * 1000));
-  timeCurrent.textContent = formatTime(current);
-  timeTotal.textContent = formatTime(duration);
-  miniTime.textContent = formatTime(current);
+  const currentText = formatTime(current);
+  setText(timeCurrent, currentText);
+  setText(timeTotal, formatTime(duration));
+  setText(miniTime, currentText);
 }
 
 function draw() {
@@ -1107,9 +1166,9 @@ function draw() {
   const beatMotion = !audio.paused ? continuousBeat * 0.015 : 0;
   const energy = Math.max(smoothedEnergy * 1.08, logoPulse * 0.34, coreBreath * 0.92, beatMotion);
   const earlyDip = timingPulse > 0.5 ? -0.005 * Math.min(1, timingPulse) : 0;
-  const coreRect = core.getBoundingClientRect();
-  const targetFollowX = coreHover ? Math.max(-9, Math.min(9, (pointerX - (coreRect.left + coreRect.width / 2)) * 0.045)) : 0;
-  const targetFollowY = coreHover ? Math.max(-9, Math.min(9, (pointerY - (coreRect.top + coreRect.height / 2)) * 0.045)) : 0;
+  const coreSize = core.offsetWidth || Math.min(width, height) * 0.66;
+  const targetFollowX = coreHover ? Math.max(-9, Math.min(9, (pointerX - width / 2) * 0.045)) : 0;
+  const targetFollowY = coreHover ? Math.max(-9, Math.min(9, (pointerY - height / 2) * 0.045)) : 0;
   coreFollowX += (targetFollowX - coreFollowX) * Math.min(1, elapsed / 120);
   coreFollowY += (targetFollowY - coreFollowY) * Math.min(1, elapsed / 120);
   const hoverBoost = coreHover ? 0.045 : 0;
@@ -1149,37 +1208,47 @@ function draw() {
     paused: audio.paused,
     currentTime: audio.currentTime,
   };
-  core.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale})`;
+  const coreTransform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale.toFixed(4)})`;
+  if (core.style.transform !== coreTransform) core.style.transform = coreTransform;
   if (coreAura) {
     const ghostSize = Math.max(0.2, settings.ghostSize || 1.18);
     const relativeGhostScale = Math.max(0.2, (coreGhostScale / Math.max(0.2, coreScale)) * ghostSize * (1.025 + auraBreath * 0.12));
-    coreAura.style.transform = `scale(${relativeGhostScale})`;
+    const ghostTransform = `scale(${relativeGhostScale.toFixed(4)})`;
+    if (coreAura.style.transform !== ghostTransform) coreAura.style.transform = ghostTransform;
   }
-  core.style.boxShadow = `0 0 ${54 + energy * 170 + coreFlash * 80}px rgba(255, 72, 169, ${Math.min(0.9, 0.34 + energy * 0.5 + coreFlash * 0.22)})`;
+  const glow = Math.max(0, settings.coreGlow || 0);
+  const glowColour = hexToRgb(settings.coreGlowColor);
+  const outerGlowAlpha = Math.min(0.9, (0.34 + energy * 0.5 + coreFlash * 0.22) * glow);
+  const innerGlowAlpha = Math.min(0.5, (0.08 + coreFlash * 0.18) * glow);
+  const innerGlowSize = (18 + coreFlash * 28).toFixed(1);
+  const coreShadow = glow <= 0.001
+    ? 'none'
+    : `0 0 ${(54 + energy * 170 + coreFlash * 80).toFixed(1)}px rgba(${glowColour.r}, ${glowColour.g}, ${glowColour.b}, ${outerGlowAlpha.toFixed(3)}), inset 0 0 ${innerGlowSize}px rgba(255, 255, 255, ${innerGlowAlpha.toFixed(3)})`;
+  if (core.style.boxShadow !== coreShadow) core.style.boxShadow = coreShadow;
 
-  document.documentElement.style.setProperty('--energy', energy.toFixed(3));
-  document.documentElement.style.setProperty('--core-flash', Math.min(1, coreFlash).toFixed(3));
-  document.documentElement.style.setProperty('--core-breath', Math.min(1.2, coreBreath).toFixed(3));
-  document.documentElement.style.setProperty('--aura-breath', Math.min(1.2, auraBreath).toFixed(3));
-  document.documentElement.style.setProperty('--ghost-intensity', Math.max(0, settings.ghostIntensity || 0).toFixed(3));
-  document.documentElement.style.setProperty('--ghost-blur', Math.max(0, settings.ghostBlur || 0).toFixed(3));
+  setCssVar('--energy', energy.toFixed(2));
+  setCssVar('--core-flash', Math.min(1, coreFlash).toFixed(2));
+  setCssVar('--core-breath', Math.min(1.2, coreBreath).toFixed(2));
+  setCssVar('--aura-breath', Math.min(1.2, auraBreath).toFixed(2));
+  setCssVar('--ghost-intensity', Math.max(0, settings.ghostIntensity || 0).toFixed(3));
+  setCssVar('--ghost-blur', Math.max(0, settings.ghostBlur || 0).toFixed(3));
   const visualLight = Math.max(lightEnergy, sectionHeat * 0.12);
-  document.documentElement.style.setProperty('--light', Math.min(1.25, visualLight).toFixed(3));
-  document.documentElement.style.setProperty('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(3));
-  document.documentElement.style.setProperty('--right', Math.min(1.2, rightEnergy + rightFlash * 0.42 + visualLight * 0.18).toFixed(3));
-  document.documentElement.style.setProperty('--section', sectionHeat.toFixed(3));
-  document.documentElement.style.setProperty('--sweep', lightSweep.toFixed(3));
-  document.documentElement.style.setProperty('--flash-left', Math.min(1, leftFlash).toFixed(3));
-  document.documentElement.style.setProperty('--flash-right', Math.min(1, rightFlash).toFixed(3));
-  document.documentElement.style.setProperty('--left-soft', Math.min(1, leftSoft).toFixed(3));
-  document.documentElement.style.setProperty('--right-soft', Math.min(1, rightSoft).toFixed(3));
-  document.documentElement.style.setProperty('--left-hard', Math.min(1, leftHard).toFixed(3));
-  document.documentElement.style.setProperty('--right-hard', Math.min(1, rightHard).toFixed(3));
+  setCssVar('--light', Math.min(1.25, visualLight).toFixed(2));
+  setCssVar('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(2));
+  setCssVar('--right', Math.min(1.2, rightEnergy + rightFlash * 0.42 + visualLight * 0.18).toFixed(2));
+  setCssVar('--section', sectionHeat.toFixed(2));
+  setCssVar('--sweep', lightSweep.toFixed(2));
+  setCssVar('--flash-left', Math.min(1, leftFlash).toFixed(2));
+  setCssVar('--flash-right', Math.min(1, rightFlash).toFixed(2));
+  setCssVar('--left-soft', Math.min(1, leftSoft).toFixed(2));
+  setCssVar('--right-soft', Math.min(1, rightSoft).toFixed(2));
+  setCssVar('--left-hard', Math.min(1, leftHard).toFixed(2));
+  setCssVar('--right-hard', Math.min(1, rightHard).toFixed(2));
 
   const cx = width * 0.5;
   const cy = height * 0.5;
-  drawRippleRings(cx + coreFollowX, cy + coreFollowY, coreRect.width, now);
-  drawLogoVisualizer(cx + coreFollowX, cy + coreFollowY, energy);
+  drawRippleRings(cx + coreFollowX, cy + coreFollowY, coreSize, now);
+  drawLogoVisualizer(cx + coreFollowX, cy + coreFollowY, coreSize);
 
   for (const particle of particles) {
     particle.x += particle.vx;
@@ -1194,15 +1263,17 @@ function draw() {
   }
   particles = particles.filter((particle) => particle.life > 0.04);
 
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
   const starGlow = Math.max(0, settings.starGlow || 0);
-  for (const particle of starParticles) {
-    const progress = particle.age / particle.duration;
-    const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
-    drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
+  if (starGlow > 0.01) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const particle of starParticles) {
+      const progress = particle.age / particle.duration;
+      const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
+      drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   for (const particle of starParticles) {
     const progress = particle.age / particle.duration;
@@ -1214,50 +1285,43 @@ function draw() {
   }
 }
 
-function drawLogoVisualizer(cx, cy, energy) {
+function drawLogoVisualizer(cx, cy, coreSize) {
+  if (visualizerActiveCount <= 0) return;
   const bars = visualizerBars.length;
-  const visualiserRounds = 5;
-  const coreSize = core.getBoundingClientRect().width || Math.min(window.innerWidth, window.innerHeight) * 0.4;
   const baseRadius = coreSize * 0.472;
   const maxBarLength = coreSize * 0.58 * Math.max(0.05, settings.visualizerRange);
   const barWidth = Math.max(5.2, (Math.PI * 2 * coreSize * 0.5) / bars * 0.86);
-  const deadZone = Math.max(0.0075, 1 / Math.max(1, maxBarLength));
+  const deadZone = Math.max(0.012, 1 / Math.max(1, maxBarLength));
   ctx.save();
   ctx.translate(cx, cy);
   ctx.globalCompositeOperation = 'lighter';
   ctx.rotate(performance.now() / 27000);
 
-  const drawRoundedBar = (angle, innerRadius, length, width, radius, draw) => {
-    if (length <= 0) return;
+  for (let i = 0; i < bars; i += 1) {
+    const amplitude = visualizerBars[i];
+    if (amplitude <= deadZone) continue;
+    const angle = (i / bars) * Math.PI * 2;
+    const length = amplitude * maxBarLength;
+    const darkAlpha = Math.min(0.28, 0.05 + amplitude * 0.62);
+    const paleAlpha = Math.min(0.2, 0.026 + amplitude * 0.32);
+    const darkWidth = barWidth * 0.92;
+    const paleWidth = barWidth * 0.78;
+
     ctx.save();
     ctx.rotate(angle);
+    ctx.fillStyle = `rgba(255, 255, 255, ${darkAlpha.toFixed(3)})`;
     ctx.beginPath();
-    ctx.roundRect(innerRadius, -width / 2, length, width, radius);
-    draw();
-    ctx.restore();
-  };
+    ctx.roundRect(baseRadius, -darkWidth / 2, length, darkWidth, darkWidth * 0.5);
+    ctx.fill();
 
-  for (let round = 0; round < visualiserRounds; round += 1) {
-    const roundOffset = (round * Math.PI * 2) / visualiserRounds;
-    for (let i = 0; i < bars; i += 1) {
-      const amplitude = visualizerBars[i];
-      if (amplitude <= deadZone) continue;
-      const angle = (i / bars) * Math.PI * 2 + roundOffset;
-      const length = amplitude * maxBarLength;
-      const darkAlpha = Math.min(0.28, 0.05 + amplitude * 0.62);
-      const paleAlpha = Math.min(0.2, 0.026 + amplitude * 0.32);
-      const darkWidth = barWidth * 0.92;
-      const paleWidth = barWidth * 0.78;
-
-      ctx.fillStyle = `rgba(255, 255, 255, ${darkAlpha})`;
-      drawRoundedBar(angle, baseRadius, length, darkWidth, darkWidth * 0.5, () => ctx.fill());
-
-      if (length > coreSize * 0.022) {
-        ctx.strokeStyle = `rgba(255, 255, 255, ${paleAlpha})`;
-        ctx.lineWidth = Math.max(1.2, paleWidth * 0.18);
-        drawRoundedBar(angle, baseRadius + darkWidth * 0.06, length * 0.94, paleWidth, paleWidth * 0.5, () => ctx.stroke());
-      }
+    if (length > coreSize * 0.022) {
+      ctx.strokeStyle = `rgba(255, 255, 255, ${paleAlpha.toFixed(3)})`;
+      ctx.lineWidth = Math.max(1.2, paleWidth * 0.18);
+      ctx.beginPath();
+      ctx.roundRect(baseRadius + darkWidth * 0.06, -paleWidth / 2, length * 0.94, paleWidth, paleWidth * 0.5);
+      ctx.stroke();
     }
+    ctx.restore();
   }
 
   ctx.restore();
