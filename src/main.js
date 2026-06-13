@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-tuned-defaults-wide-ranges';
+window.__appVersion = '20260613-peak-visualizer-ghost-logo';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -100,13 +100,15 @@ let pointerY = window.innerHeight * 0.5;
 let coreFollowX = 0;
 let coreFollowY = 0;
 let coreFlash = 0;
+let coreGhostScale = 1;
 let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
 let lastAudioFountainAt = -10000;
 
 const visualizerBars = new Float32Array(200);
+const previousVisualizerBins = new Float32Array(200);
 const defaultSettings = {
-  sideIntensity: 1.1,
+  sideIntensity: 1,
   sideRestraint: 1,
   pulse: 1.8,
   visualizer: 2.4,
@@ -116,14 +118,14 @@ const defaultSettings = {
   waveSize: 0.8,
   waveIntensity: 2,
   fountain: 1.6,
-  fountainSensitivity: 2,
+  fountainSensitivity: 3.1,
 };
 const settings = { ...defaultSettings };
 
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v3';
+const settingsKey = 'osu-visual-shell-settings-v4';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -365,6 +367,11 @@ async function playIndex(index) {
   background.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   cover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   coreCover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
+  if (coreAura) {
+    coreAura.style.backgroundImage = track.backgroundUrl
+      ? `radial-gradient(circle, rgba(255, 255, 255, 0.12) 0 35%, transparent 62%), url("${track.backgroundUrl}")`
+      : '';
+  }
   trackTitle.textContent = track.title;
   trackMeta.textContent = `${track.artist}${track.version ? ` / ${track.version}` : ''}`;
   coreSubtitle.textContent = track.timingPoints?.length ? '节拍同步' : '音频同步';
@@ -395,6 +402,7 @@ async function playIndex(index) {
   coreBreath = 0;
   coreTargetBreath = 0;
   auraBreath = 0;
+  coreGhostScale = 1;
   calmWindow = 0;
   scytheEvents = [];
   starParticles = [];
@@ -405,6 +413,7 @@ async function playIndex(index) {
   lastAudioFountainAt = -10000;
   lastRippleAt = -10000;
   visualizerBars.fill(0);
+  previousVisualizerBins.fill(0);
   markActiveTrack();
   setStatus(track.timingPoints?.length ? `已读取 ${track.timingPoints.length} 个 timing points。` : '已载入，使用音频分析。');
 
@@ -781,26 +790,42 @@ function updateLogoAmplitudes(now, elapsed) {
   lastVisualizerUpdate = now;
 
   const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
-  const dynamicRange = 0.07 + Math.max(0.035, amplitudeAverage) * 0.9;
-  const userScale = 0.72 + settings.visualizer * 0.36;
-  const noiseFloor = Math.max(0.026, amplitudeAverage * 0.2);
+  const dynamicRange = 0.08 + Math.max(0.04, amplitudeAverage) * 1.05;
+  const userScale = 0.66 + Math.max(0, settings.visualizer) * 0.34;
+  const noiseFloor = Math.max(0.034, amplitudeAverage * 0.28);
   const contrast = Math.max(0.1, settings.visualizerContrast || 1.6);
   const startupLimiter = Math.min(1, Math.max(0.18, (audio.currentTime || 0) / 2.8));
-  const attackLimit = (0.018 + Math.min(0.052, audioAmplitude * 0.07)) * (activeEffectPoint?.kiai ? 1.22 : 1);
+  const attackLimit = (0.028 + Math.min(0.09, audioAmplitude * 0.11)) * (activeEffectPoint?.kiai ? 1.25 : 1);
+  const candidates = [];
+
   for (let i = 0; i < visualizerBars.length; i += 1) {
     const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
     const raw = (freqData[sourceIndex] || 0) / 255;
     const prev = (freqData[(sourceIndex + freqData.length - 2) % freqData.length] || 0) / 255;
     const next = (freqData[(sourceIndex + 2) % freqData.length] || 0) / 255;
     const localAverage = (prev + next) * 0.5;
-    const peak = Math.max(0, raw - localAverage * 0.52 - noiseFloor);
+    const localPeak = raw > prev * 1.04 && raw >= next * 0.98;
+    const freshLift = Math.max(0, raw - previousVisualizerBins[i]);
+    const peak = Math.max(0, raw - localAverage * 0.72 - noiseFloor + freshLift * 0.42);
+    previousVisualizerBins[i] = raw;
+    if (!localPeak || peak <= 0) continue;
     const normalised = peak / dynamicRange;
     const compressed = Math.min(1, normalised);
     const shaped = Math.pow(compressed, contrast);
-    const target = Math.min(0.5, shaped * (0.36 + contrast * 0.08) * kiaiMultiplier * userScale * startupLimiter);
-    if (target > visualizerBars[i]) {
-      visualizerBars[i] = Math.min(target, visualizerBars[i] + attackLimit);
-    }
+    const target = Math.min(0.82, shaped * (0.42 + contrast * 0.12) * kiaiMultiplier * userScale * startupLimiter);
+    if (target > visualizerBars[i]) candidates.push({ index: i, target, score: target + freshLift * 0.5 });
+  }
+
+  candidates
+    .sort((a, b) => b.score - a.score)
+    .slice(0, activeEffectPoint?.kiai ? 34 : 24)
+    .forEach(({ index, target }) => {
+      visualizerBars[index] = Math.min(target, visualizerBars[index] + attackLimit);
+    });
+
+  for (let i = 1; i < visualizerBars.length - 1; i += 1) {
+    const neighbourCap = Math.max(visualizerBars[i - 1], visualizerBars[i + 1]) * 0.92;
+    if (visualizerBars[i] > neighbourCap && visualizerBars[i] < 0.08) visualizerBars[i] *= 0.86;
   }
   visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
 }
@@ -1060,6 +1085,7 @@ function draw() {
   coreFollowY += (targetFollowY - coreFollowY) * Math.min(1, elapsed / 120);
   const hoverBoost = coreHover ? 0.045 : 0;
   const coreScale = 1 + (coreBreath * 0.092 + energy * 0.045 + timingPulse * 0.006) * settings.pulse + hoverBoost + earlyDip;
+  coreGhostScale += (coreScale - coreGhostScale) * Math.min(1, elapsed / 560);
   debugScaleMin = Math.min(debugScaleMin, coreScale);
   debugScaleMax = Math.max(debugScaleMax, coreScale);
   window.__visualDebug = {
@@ -1081,6 +1107,7 @@ function draw() {
     coreFlash,
     coreBreath,
     auraBreath,
+    coreGhostScale,
     audioAmplitude,
     amplitudeAverage,
     calmWindow,
@@ -1094,7 +1121,7 @@ function draw() {
   };
   core.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale})`;
   if (coreAura) {
-    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${0.96 + auraBreath * 0.14})`;
+    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreGhostScale * (1.025 + auraBreath * 0.12)})`;
   }
   core.style.boxShadow = `0 0 ${54 + energy * 170 + coreFlash * 80}px rgba(255, 72, 169, ${Math.min(0.9, 0.34 + energy * 0.5 + coreFlash * 0.22)})`;
 
@@ -1153,9 +1180,18 @@ function drawLogoVisualizer(cx, cy, energy) {
   const deadZone = Math.max(0.0075, 1 / Math.max(1, maxBarLength));
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.lineCap = 'butt';
   ctx.globalCompositeOperation = 'lighter';
   ctx.rotate(performance.now() / 27000);
+
+  const drawRoundedBar = (angle, innerRadius, length, width, radius, draw) => {
+    if (length <= 0) return;
+    ctx.save();
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.roundRect(innerRadius, -width / 2, length, width, radius);
+    draw();
+    ctx.restore();
+  };
 
   for (let round = 0; round < visualiserRounds; round += 1) {
     const roundOffset = (round * Math.PI * 2) / visualiserRounds;
@@ -1164,15 +1200,19 @@ function drawLogoVisualizer(cx, cy, energy) {
       if (amplitude <= deadZone) continue;
       const angle = (i / bars) * Math.PI * 2 + roundOffset;
       const length = amplitude * maxBarLength;
-      const r1 = baseRadius;
-      const r2 = r1 + length;
-      const alpha = Math.min(0.28, 0.05 + amplitude * 0.62);
-      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-      ctx.lineWidth = barWidth;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * r1, Math.sin(angle) * r1);
-      ctx.lineTo(Math.cos(angle) * r2, Math.sin(angle) * r2);
-      ctx.stroke();
+      const darkAlpha = Math.min(0.28, 0.05 + amplitude * 0.62);
+      const paleAlpha = Math.min(0.2, 0.026 + amplitude * 0.32);
+      const darkWidth = barWidth * 0.92;
+      const paleWidth = barWidth * 0.78;
+
+      ctx.fillStyle = `rgba(255, 255, 255, ${darkAlpha})`;
+      drawRoundedBar(angle, baseRadius, length, darkWidth, darkWidth * 0.5, () => ctx.fill());
+
+      if (length > coreSize * 0.022) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${paleAlpha})`;
+        ctx.lineWidth = Math.max(1.2, paleWidth * 0.18);
+        drawRoundedBar(angle, baseRadius + darkWidth * 0.06, length * 0.94, paleWidth, paleWidth * 0.5, () => ctx.stroke());
+      }
     }
   }
 

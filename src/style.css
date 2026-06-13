@@ -128,16 +128,21 @@ button:hover,
   position: fixed;
   top: 50%;
   left: 50%;
-  width: clamp(560px, 78vmin, 920px);
+  width: clamp(500px, 70vmin, 830px);
   aspect-ratio: 1;
   border-radius: 50%;
   pointer-events: none;
   z-index: 3;
-  opacity: calc(0.2 + var(--aura-breath) * 0.36 + var(--core-flash) * 0.16);
+  opacity: calc(0.22 + var(--aura-breath) * 0.32 + var(--core-flash) * 0.14);
   background:
     radial-gradient(circle, rgba(255, 255, 255, calc(0.08 + var(--core-flash) * 0.16)) 0 34%, transparent 54%),
     radial-gradient(circle, rgba(255, 90, 185, calc(0.24 + var(--aura-breath) * 0.24)) 0 44%, transparent 70%);
-  filter: blur(calc(22px + var(--aura-breath) * 24px));
+  background-position: center;
+  background-size: cover;
+  box-shadow:
+    0 0 calc(38px + var(--aura-breath) * 70px) rgba(255, 90, 185, calc(0.18 + var(--aura-breath) * 0.22)),
+    inset 0 0 42px rgba(255, 255, 255, calc(0.06 + var(--core-flash) * 0.12));
+  filter: blur(calc(5px + var(--aura-breath) * 9px)) saturate(1.12);
   mix-blend-mode: screen;
   transform: translate(-50%, -50%) scale(calc(0.96 + var(--core-breath) * 0.1));
   will-change: transform, opacity, filter;
