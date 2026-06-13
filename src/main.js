@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-glow-controls-perf-pass';
+window.__appVersion = '20260613-restore-canvas-effects';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -106,7 +106,6 @@ let coreGhostScale = 1;
 let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
 let lastAudioFountainAt = -10000;
-let visualizerActiveCount = 0;
 const cssVarCache = new Map();
 const textCache = new WeakMap();
 
@@ -123,7 +122,7 @@ const defaultSettings = {
   coreGlow: 1,
   coreGlowColor: '#ff48a9',
   ghostIntensity: 0.8,
-  ghostSize: 1,
+  ghostSize: 0,
   ghostLag: 0.1,
   ghostBlur: 0.1,
   visualizer: 5.4,
@@ -141,7 +140,7 @@ const settings = { ...defaultSettings };
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v8';
+const settingsKey = 'osu-visual-shell-settings-v9';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -841,11 +840,9 @@ function updateAudioEnergy() {
 
 function updateLogoAmplitudes(now, elapsed) {
   const decayFactor = elapsed * 0.0024 * Math.max(0.05, settings.visualizerDecay);
-  visualizerActiveCount = 0;
   for (let i = 0; i < visualizerBars.length; i += 1) {
     visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
-    if (visualizerBars[i] > 0.01) visualizerActiveCount += 1;
   }
 
   if (!freqData || audio.paused || now - lastVisualizerUpdate < 32) return;
@@ -883,7 +880,6 @@ function updateLogoAmplitudes(now, elapsed) {
     .slice(0, activeEffectPoint?.kiai ? 34 : 24)
     .forEach(({ index, target }) => {
       visualizerBars[index] = Math.min(target, visualizerBars[index] + attackLimit);
-      if (visualizerBars[index] > 0.01) visualizerActiveCount += 1;
     });
 
   for (let i = 1; i < visualizerBars.length - 1; i += 1) {
@@ -1211,7 +1207,7 @@ function draw() {
   const coreTransform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale.toFixed(4)})`;
   if (core.style.transform !== coreTransform) core.style.transform = coreTransform;
   if (coreAura) {
-    const ghostSize = Math.max(0.2, settings.ghostSize || 1.18);
+    const ghostSize = Math.max(0.05, 1 + (settings.ghostSize ?? 0));
     const relativeGhostScale = Math.max(0.2, (coreGhostScale / Math.max(0.2, coreScale)) * ghostSize * (1.025 + auraBreath * 0.12));
     const ghostTransform = `scale(${relativeGhostScale.toFixed(4)})`;
     if (coreAura.style.transform !== ghostTransform) coreAura.style.transform = ghostTransform;
@@ -1264,16 +1260,14 @@ function draw() {
   particles = particles.filter((particle) => particle.life > 0.04);
 
   const starGlow = Math.max(0, settings.starGlow || 0);
-  if (starGlow > 0.01) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const particle of starParticles) {
-      const progress = particle.age / particle.duration;
-      const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
-      drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
-    }
-    ctx.restore();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const particle of starParticles) {
+    const progress = particle.age / particle.duration;
+    const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
+    drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
   }
+  ctx.restore();
 
   for (const particle of starParticles) {
     const progress = particle.age / particle.duration;
@@ -1286,42 +1280,48 @@ function draw() {
 }
 
 function drawLogoVisualizer(cx, cy, coreSize) {
-  if (visualizerActiveCount <= 0) return;
   const bars = visualizerBars.length;
+  const visualiserRounds = 5;
   const baseRadius = coreSize * 0.472;
   const maxBarLength = coreSize * 0.58 * Math.max(0.05, settings.visualizerRange);
   const barWidth = Math.max(5.2, (Math.PI * 2 * coreSize * 0.5) / bars * 0.86);
-  const deadZone = Math.max(0.012, 1 / Math.max(1, maxBarLength));
+  const deadZone = Math.max(0.0075, 1 / Math.max(1, maxBarLength));
   ctx.save();
   ctx.translate(cx, cy);
   ctx.globalCompositeOperation = 'lighter';
   ctx.rotate(performance.now() / 27000);
 
-  for (let i = 0; i < bars; i += 1) {
-    const amplitude = visualizerBars[i];
-    if (amplitude <= deadZone) continue;
-    const angle = (i / bars) * Math.PI * 2;
-    const length = amplitude * maxBarLength;
-    const darkAlpha = Math.min(0.28, 0.05 + amplitude * 0.62);
-    const paleAlpha = Math.min(0.2, 0.026 + amplitude * 0.32);
-    const darkWidth = barWidth * 0.92;
-    const paleWidth = barWidth * 0.78;
-
+  const drawRoundedBar = (angle, innerRadius, length, width, radius, draw) => {
+    if (length <= 0) return;
     ctx.save();
     ctx.rotate(angle);
-    ctx.fillStyle = `rgba(255, 255, 255, ${darkAlpha.toFixed(3)})`;
     ctx.beginPath();
-    ctx.roundRect(baseRadius, -darkWidth / 2, length, darkWidth, darkWidth * 0.5);
-    ctx.fill();
-
-    if (length > coreSize * 0.022) {
-      ctx.strokeStyle = `rgba(255, 255, 255, ${paleAlpha.toFixed(3)})`;
-      ctx.lineWidth = Math.max(1.2, paleWidth * 0.18);
-      ctx.beginPath();
-      ctx.roundRect(baseRadius + darkWidth * 0.06, -paleWidth / 2, length * 0.94, paleWidth, paleWidth * 0.5);
-      ctx.stroke();
-    }
+    ctx.roundRect(innerRadius, -width / 2, length, width, radius);
+    draw();
     ctx.restore();
+  };
+
+  for (let round = 0; round < visualiserRounds; round += 1) {
+    const roundOffset = (round * Math.PI * 2) / visualiserRounds;
+    for (let i = 0; i < bars; i += 1) {
+      const amplitude = visualizerBars[i];
+      if (amplitude <= deadZone) continue;
+      const angle = (i / bars) * Math.PI * 2 + roundOffset;
+      const length = amplitude * maxBarLength;
+      const darkAlpha = Math.min(0.28, 0.05 + amplitude * 0.62);
+      const paleAlpha = Math.min(0.2, 0.026 + amplitude * 0.32);
+      const darkWidth = barWidth * 0.92;
+      const paleWidth = barWidth * 0.78;
+
+      ctx.fillStyle = `rgba(255, 255, 255, ${darkAlpha})`;
+      drawRoundedBar(angle, baseRadius, length, darkWidth, darkWidth * 0.5, () => ctx.fill());
+
+      if (length > coreSize * 0.022) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${paleAlpha})`;
+        ctx.lineWidth = Math.max(1.2, paleWidth * 0.18);
+        drawRoundedBar(angle, baseRadius + darkWidth * 0.06, length * 0.94, paleWidth, paleWidth * 0.5, () => ctx.stroke());
+      }
+    }
   }
 
   ctx.restore();

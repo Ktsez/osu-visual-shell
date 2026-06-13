@@ -69,7 +69,6 @@ button:hover,
 #stage {
   z-index: 2;
   pointer-events: none;
-  contain: strict;
 }
 
 #background {
