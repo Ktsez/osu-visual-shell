@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>side light preview</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      :root {
+        --left-soft: 0.62;
+        --right-soft: 0.42;
+        --left-hard: 0.9;
+        --right-hard: 0.18;
+        --light: 0.74;
+        --sweep: 0.82;
+        --left: 0.5;
+        --right: 0.5;
+      }
+
+      .preview-note {
+        position: fixed;
+        left: 50%;
+        bottom: 28px;
+        z-index: 4;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.72);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="background"></div>
+    <div id="shade"></div>
+    <main id="app" class="app" data-panel="idle">
+      <section class="visual" aria-label="side light preview">
+        <div class="scythe scythe-left" aria-hidden="true">
+          <span class="side-glow side-glow-soft"></span>
+          <span class="side-glow side-glow-hard"></span>
+        </div>
+        <div class="scythe scythe-right" aria-hidden="true">
+          <span class="side-glow side-glow-soft"></span>
+          <span class="side-glow side-glow-hard"></span>
+        </div>
+      </section>
+    </main>
+    <p class="preview-note">左侧强闪 / 右侧中闪，用来检查舞台侧光、亮度和边缘柔和度</p>
+  </body>
+</html>
