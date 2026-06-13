@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-peak-visualizer-ghost-logo';
+window.__appVersion = '20260613-fountain-performance-tune';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -107,13 +107,17 @@ let lastAudioFountainAt = -10000;
 
 const visualizerBars = new Float32Array(200);
 const previousVisualizerBins = new Float32Array(200);
+const maxStarParticles = 220;
+const maxStarSpawnsPerFrame = 18;
+const starPath = createStarPath();
+const hollowStarPath = createStarPath(0.58);
 const defaultSettings = {
   sideIntensity: 1,
   sideRestraint: 1,
   pulse: 1.8,
-  visualizer: 2.4,
-  visualizerRange: 2.6,
-  visualizerContrast: 1.6,
+  visualizer: 5.4,
+  visualizerRange: 3,
+  visualizerContrast: 1.2,
   visualizerDecay: 1.3,
   waveSize: 0.8,
   waveIntensity: 2,
@@ -125,7 +129,7 @@ const settings = { ...defaultSettings };
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v4';
+const settingsKey = 'osu-visual-shell-settings-v5';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -850,6 +854,29 @@ function spawnBurst(count = 10) {
   particles = particles.slice(-320);
 }
 
+function createStarPath(innerRatio = 0.5) {
+  const path = new Path2D();
+  const points = [];
+  for (let i = 0; i < 10; i += 1) {
+    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+    const radius = i % 2 === 0 ? 1 : innerRatio;
+    points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+  }
+
+  for (let i = 0; i < points.length; i += 1) {
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    const control = {
+      x: current.x * 0.88 + next.x * 0.12,
+      y: current.y * 0.88 + next.y * 0.12,
+    };
+    if (i === 0) path.moveTo(current.x, current.y);
+    path.quadraticCurveTo(control.x, control.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
+  }
+  path.closePath();
+  return path;
+}
+
 function spawnRipple(power = 0.6, reason = 'beat') {
   const now = performance.now();
   if (now - lastRippleAt < 140) return;
@@ -897,12 +924,12 @@ function triggerStarFountain(power = 1, reason = 'kiai') {
   const direction = Math.floor(Math.random() * 3) - 1;
   fountainBursts.push({
     start: now,
-    end: now + 860 + power * 220,
-    power: power * settings.fountain,
+    end: now + 720 + power * 170,
+    power: Math.min(1.9, power * settings.fountain),
     direction,
     lastSpawn: now - 20,
   });
-  fountainBursts = fountainBursts.slice(-4);
+  fountainBursts = fountainBursts.slice(-2);
 }
 
 function updateStarFountains(now, elapsed) {
@@ -910,14 +937,17 @@ function updateStarFountains(now, elapsed) {
   const height = window.innerHeight;
   const originOffset = Math.min(260, Math.max(120, width * 0.16));
   const dt = elapsed / 1000;
+  let spawnsThisFrame = 0;
 
   for (const burst of fountainBursts) {
     if (now > burst.end) continue;
 
-    const spawnEvery = 1000 / (80 + burst.power * 80);
-    while (now - burst.lastSpawn >= spawnEvery) {
+    const pressure = starParticles.length / maxStarParticles;
+    const spawnEvery = 1000 / Math.max(56, (78 + burst.power * 58) * (1 - pressure * 0.42));
+    while (now - burst.lastSpawn >= spawnEvery && spawnsThisFrame < maxStarSpawnsPerFrame && starParticles.length < maxStarParticles) {
       burst.lastSpawn += spawnEvery;
       for (const side of [-1, 1]) {
+        if (spawnsThisFrame >= maxStarSpawnsPerFrame || starParticles.length >= maxStarParticles) break;
         const age = burst.lastSpawn - burst.start;
         const progress = Math.max(0, Math.min(1, age / (burst.end - burst.start)));
         const x = side < 0 ? originOffset : width - originOffset;
@@ -932,60 +962,48 @@ function updateStarFountains(now, elapsed) {
           vy,
           gravity: 980,
           age: 0,
-          duration: 620 + Math.random() * 760,
-          size: 9.5 + Math.random() * 10.5,
+          duration: 560 + Math.random() * 620,
+          size: 9 + Math.random() * 9,
           rotation: Math.random() * Math.PI * 2,
-          spin: (Math.random() - 0.5) * 7,
+          spin: (Math.random() - 0.5) * 5.5,
           hollow: Math.random() < 0.34,
         });
+        spawnsThisFrame += 1;
       }
     }
   }
 
   fountainBursts = fountainBursts.filter((burst) => now <= burst.end);
-  for (const particle of starParticles) {
+  let writeIndex = 0;
+  for (let i = 0; i < starParticles.length; i += 1) {
+    const particle = starParticles[i];
     particle.age += elapsed;
     particle.vy += particle.gravity * dt;
     particle.x += particle.vx * dt;
     particle.y += particle.vy * dt;
     particle.rotation += particle.spin * dt;
+    if (particle.age < particle.duration && particle.y < height + 80) {
+      starParticles[writeIndex] = particle;
+      writeIndex += 1;
+    }
   }
-  starParticles = starParticles.filter((particle) => particle.age < particle.duration && particle.y < height + 80);
+  starParticles.length = writeIndex;
 }
 
 function drawStar(ctx, x, y, radius, rotation, alpha, hollow = false) {
-  const inner = radius * 0.5;
-  const points = [];
-  for (let i = 0; i < 10; i += 1) {
-    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
-    const r = i % 2 === 0 ? radius : inner;
-    points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
-  }
-
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
-  ctx.beginPath();
-  for (let i = 0; i < points.length; i += 1) {
-    const current = points[i];
-    const next = points[(i + 1) % points.length];
-    const control = {
-      x: current.x * 0.88 + next.x * 0.12,
-      y: current.y * 0.88 + next.y * 0.12,
-    };
-    if (i === 0) ctx.moveTo(current.x, current.y);
-    ctx.quadraticCurveTo(control.x, control.y, (current.x + next.x) / 2, (current.y + next.y) / 2);
-  }
-  ctx.closePath();
-  ctx.shadowColor = `rgba(255, 255, 255, ${alpha})`;
-  ctx.shadowBlur = 10 + radius * 1.2;
+  ctx.scale(radius, radius);
+  ctx.globalAlpha = alpha;
   if (hollow) {
-    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.92})`;
-    ctx.lineWidth = Math.max(2, radius * 0.18);
-    ctx.stroke();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 0.18;
+    ctx.lineJoin = 'round';
+    ctx.stroke(hollowStarPath);
   } else {
-    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fill(starPath);
   }
   ctx.restore();
 }
