@@ -4,6 +4,8 @@
 
 osu! Visual Shell 是一个可以在本地运行的 osu! 风格音乐视觉外壳。它不是 osu! 游戏客户端，也不包含任何游戏模式；它专注于还原一种接近 osu! 主菜单/音乐舞台的视觉体验：中间的大圆盘、歌曲封面、节奏律动、圆盘留影、能量柱、侧灯、星星喷泉和本地音乐播放控制。
 
+当前版本：`1.0.0-beta.1`
+
 这个项目的目标是让用户可以读取自己电脑里的本地音乐，或者扫描本机已有的 osu! Songs 谱面文件夹，然后在浏览器中播放音乐并生成动态视觉效果。
 
 ### 核心特点
@@ -86,6 +88,10 @@ http://localhost:4173/scythe-preview.html
 
 如果读取 osu! Songs 文件夹，音乐和背景图来自用户电脑本地已经拥有的谱面目录。请确保你拥有对应文件的使用权。
 
+### 开源协议
+
+本项目使用 MIT License 开源。你可以自由使用、修改和分发本项目代码，但需要保留原始版权和许可声明。
+
 ### 技术说明
 
 - 前端使用原生 HTML、CSS 和 Canvas。
@@ -99,6 +105,8 @@ http://localhost:4173/scythe-preview.html
 ## English Version
 
 osu! Visual Shell is a locally runnable osu!-inspired music visual shell. It is not an osu! game client and does not include gameplay modes. The project focuses on recreating a stage-like main-menu music experience: a large center disc, album cover display, beat-driven pulsing, ghost overlay, audio bars, side lights, star fountains, and local music controls.
+
+Current version: `1.0.0-beta.1`
 
 The goal is to let users play local music from their own computer, or scan an existing osu! Songs folder, then generate responsive visual effects directly in the browser.
 
@@ -182,6 +190,10 @@ http://localhost:4173/scythe-preview.html
 This project does not copy osu! gameplay features, official osu! assets, beatmaps, songs, or third-party music service content. It only reads files that already exist on the user's local computer.
 
 When scanning an osu! Songs folder, music and background images are loaded from the user's existing local beatmap directories. Please make sure you have the right to use those files.
+
+### License
+
+This project is open-sourced under the MIT License. You may use, modify, and distribute the code freely as long as the original copyright and license notice are preserved.
 
 ### Technical Notes
 
