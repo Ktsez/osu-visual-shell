@@ -1,5 +1,5 @@
 const app = document.querySelector('#app');
-window.__appVersion = '20260613-fountain-performance-tune';
+window.__appVersion = '20260613-star-glow-ghost-settings';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const background = document.querySelector('#background');
@@ -115,6 +115,10 @@ const defaultSettings = {
   sideIntensity: 1,
   sideRestraint: 1,
   pulse: 1.8,
+  ghostIntensity: 1.6,
+  ghostSize: 1.18,
+  ghostLag: 1.35,
+  ghostBlur: 1,
   visualizer: 5.4,
   visualizerRange: 3,
   visualizerContrast: 1.2,
@@ -129,7 +133,7 @@ const settings = { ...defaultSettings };
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
-const settingsKey = 'osu-visual-shell-settings-v5';
+const settingsKey = 'osu-visual-shell-settings-v6';
 
 function touch(panel = null) {
   lastInteraction = performance.now();
@@ -1008,6 +1012,16 @@ function drawStar(ctx, x, y, radius, rotation, alpha, hollow = false) {
   ctx.restore();
 }
 
+function drawStarGlow(ctx, x, y, radius, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawRippleRings(cx, cy, coreSize, now) {
   ctx.save();
   ctx.translate(cx, cy);
@@ -1103,7 +1117,8 @@ function draw() {
   coreFollowY += (targetFollowY - coreFollowY) * Math.min(1, elapsed / 120);
   const hoverBoost = coreHover ? 0.045 : 0;
   const coreScale = 1 + (coreBreath * 0.092 + energy * 0.045 + timingPulse * 0.006) * settings.pulse + hoverBoost + earlyDip;
-  coreGhostScale += (coreScale - coreGhostScale) * Math.min(1, elapsed / 560);
+  const ghostLag = Math.max(0.1, settings.ghostLag || 1.35);
+  coreGhostScale += (coreScale - coreGhostScale) * Math.min(1, elapsed / (420 * ghostLag));
   debugScaleMin = Math.min(debugScaleMin, coreScale);
   debugScaleMax = Math.max(debugScaleMax, coreScale);
   window.__visualDebug = {
@@ -1139,7 +1154,8 @@ function draw() {
   };
   core.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale})`;
   if (coreAura) {
-    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreGhostScale * (1.025 + auraBreath * 0.12)})`;
+    const ghostSize = Math.max(0.2, settings.ghostSize || 1.18);
+    coreAura.style.transform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreGhostScale * ghostSize * (1.025 + auraBreath * 0.12)})`;
   }
   core.style.boxShadow = `0 0 ${54 + energy * 170 + coreFlash * 80}px rgba(255, 72, 169, ${Math.min(0.9, 0.34 + energy * 0.5 + coreFlash * 0.22)})`;
 
@@ -1147,6 +1163,8 @@ function draw() {
   document.documentElement.style.setProperty('--core-flash', Math.min(1, coreFlash).toFixed(3));
   document.documentElement.style.setProperty('--core-breath', Math.min(1.2, coreBreath).toFixed(3));
   document.documentElement.style.setProperty('--aura-breath', Math.min(1.2, auraBreath).toFixed(3));
+  document.documentElement.style.setProperty('--ghost-intensity', Math.max(0, settings.ghostIntensity || 0).toFixed(3));
+  document.documentElement.style.setProperty('--ghost-blur', Math.max(0, settings.ghostBlur || 0).toFixed(3));
   const visualLight = Math.max(lightEnergy, sectionHeat * 0.12);
   document.documentElement.style.setProperty('--light', Math.min(1.25, visualLight).toFixed(3));
   document.documentElement.style.setProperty('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(3));
@@ -1177,6 +1195,15 @@ function draw() {
     ctx.fill();
   }
   particles = particles.filter((particle) => particle.life > 0.04);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const particle of starParticles) {
+    const progress = particle.age / particle.duration;
+    const alpha = Math.max(0, (1 - progress) * 0.28);
+    drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
+  }
+  ctx.restore();
 
   for (const particle of starParticles) {
     const progress = particle.age / particle.duration;

@@ -122,6 +122,34 @@
             </div>
           </label>
           <label>
+            <span>圆盘留影强度</span>
+            <div class="setting-control">
+              <input id="setting-ghost-intensity" data-setting="ghostIntensity" type="range" min="0" max="4" step="0.05" value="1.6" />
+              <input class="setting-number" data-setting-number="ghostIntensity" type="number" min="0" max="4" step="0.1" value="1.6" />
+            </div>
+          </label>
+          <label>
+            <span>圆盘留影大小</span>
+            <div class="setting-control">
+              <input id="setting-ghost-size" data-setting="ghostSize" type="range" min="0.6" max="2.4" step="0.05" value="1.18" />
+              <input class="setting-number" data-setting-number="ghostSize" type="number" min="0.6" max="2.4" step="0.1" value="1.2" />
+            </div>
+          </label>
+          <label>
+            <span>圆盘留影延迟</span>
+            <div class="setting-control">
+              <input id="setting-ghost-lag" data-setting="ghostLag" type="range" min="0.1" max="2.4" step="0.05" value="1.35" />
+              <input class="setting-number" data-setting-number="ghostLag" type="number" min="0.1" max="2.4" step="0.1" value="1.4" />
+            </div>
+          </label>
+          <label>
+            <span>圆盘留影虚化</span>
+            <div class="setting-control">
+              <input id="setting-ghost-blur" data-setting="ghostBlur" type="range" min="0" max="2.5" step="0.05" value="1" />
+              <input class="setting-number" data-setting-number="ghostBlur" type="number" min="0" max="2.5" step="0.1" value="1.0" />
+            </div>
+          </label>
+          <label>
             <span>能量柱长度</span>
             <div class="setting-control">
               <input id="setting-visualizer" data-setting="visualizer" type="range" min="2.4" max="8.4" step="0.05" value="5.4" />
@@ -183,6 +211,6 @@
     </main>
 
     <audio id="audio" crossorigin="anonymous"></audio>
-    <script type="module" src="/src/main.js?v=20260613-fountain-performance-tune"></script>
+    <script type="module" src="/src/main.js?v=20260613-star-glow-ghost-settings"></script>
   </body>
 </html>
