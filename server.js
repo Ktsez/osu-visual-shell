@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { opendir, readFile, stat } from 'node:fs/promises';
-import { extname, join, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -120,6 +120,130 @@ async function scanMusicFolder(folderPath, max = 1500) {
   return tracks;
 }
 
+function lazerFilePath(filesPath, hash) {
+  return join(filesPath, hash[0], hash.slice(0, 2), hash);
+}
+
+function classifyStoredFile(buffer) {
+  const header = buffer.subarray(0, 16).toString('hex');
+  const text = buffer.subarray(0, 5000).toString('utf8');
+  if (text.includes('[General]') && text.includes('[Metadata]')) return 'osu';
+  if (header.startsWith('494433') || header.startsWith('fffb') || header.startsWith('fff3') || header.startsWith('4f676753')) return 'audio';
+  if (header.startsWith('89504e47') || header.startsWith('ffd8ff') || header.startsWith('52494646')) return 'image';
+  return 'other';
+}
+
+function resolveLazerRoot(inputPath) {
+  const resolved = resolve(inputPath);
+  if (basename(resolved).toLowerCase() === 'files' && existsSync(join(dirname(resolved), 'client.realm'))) {
+    return dirname(resolved);
+  }
+  return resolved;
+}
+
+async function collectLazerFiles(filesPath) {
+  const items = [];
+
+  async function walk(dir, depth = 0) {
+    if (depth > 3) return;
+    let handle;
+    try {
+      handle = await opendir(dir);
+    } catch {
+      return;
+    }
+
+    for await (const entry of handle) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile() || !/^[a-f0-9]{64}$/i.test(entry.name)) continue;
+
+      try {
+        const [buffer, info] = await Promise.all([readFile(fullPath), stat(fullPath)]);
+        const kind = classifyStoredFile(buffer);
+        if (kind === 'other') continue;
+        items.push({
+          hash: entry.name.toLowerCase(),
+          path: fullPath,
+          kind,
+          size: info.size,
+          mtime: info.mtimeMs,
+          text: kind === 'osu' ? buffer.toString('utf8') : '',
+        });
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  await walk(filesPath);
+  return items;
+}
+
+function nearestAudio(osuItem, audioItems) {
+  const candidates = audioItems
+    .map((item) => ({ item, distance: Math.abs(item.mtime - osuItem.mtime) }))
+    .filter(({ item, distance }) => item.size > 220000 && distance < 5000)
+    .sort((a, b) => a.distance - b.distance);
+  return candidates[0]?.item || null;
+}
+
+function nearestBackground(osuItem, imageItems) {
+  const candidates = imageItems
+    .map((item) => ({ item, distance: Math.abs(item.mtime - osuItem.mtime) }))
+    .filter(({ item, distance }) => item.size > 18000 && distance < 3500)
+    .sort((a, b) => {
+      const scoreA = a.distance / 1000 - Math.min(1.2, Math.log10(Math.max(1, a.item.size)) / 6);
+      const scoreB = b.distance / 1000 - Math.min(1.2, Math.log10(Math.max(1, b.item.size)) / 6);
+      return scoreA - scoreB;
+    });
+  return candidates[0]?.item || null;
+}
+
+async function scanLazerLibrary(lazerPath) {
+  const lazerRoot = resolveLazerRoot(lazerPath);
+  const filesPath = join(lazerRoot, 'files');
+  if (!existsSync(join(lazerRoot, 'client.realm')) || !existsSync(filesPath)) {
+    throw new Error('没有找到 osu!lazer 的 client.realm 和 files 目录');
+  }
+
+  const items = await collectLazerFiles(filesPath);
+  const osuItems = items.filter((item) => item.kind === 'osu');
+  const audioItems = items.filter((item) => item.kind === 'audio');
+  const imageItems = items.filter((item) => item.kind === 'image');
+  const entries = [];
+
+  for (const item of osuItems) {
+    if (entries.length >= 1500) break;
+    try {
+      const parsed = parseOsuFile(item.text, '');
+      const audio = nearestAudio(item, audioItems);
+      if (!audio) continue;
+      const background = nearestBackground(item, imageItems);
+      entries.push({
+        id: createHash('sha1').update(item.hash).digest('hex').slice(0, 12),
+        source: 'lazer',
+        title: parsed.title,
+        artist: parsed.artist,
+        creator: parsed.creator,
+        version: parsed.version,
+        audioUrl: mediaId(audio.path),
+        backgroundUrl: background ? mediaId(background.path) : '',
+        timingPoints: parsed.timingPoints,
+        durationHint: audio.size,
+        path: item.path,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return entries;
+}
+
 function likelyOsuPaths() {
   const home = homedir();
   return [
@@ -129,9 +253,19 @@ function likelyOsuPaths() {
   ].filter((path) => existsSync(path));
 }
 
+function likelyLazerPaths() {
+  const home = homedir();
+  return [
+    join(home, 'AppData', 'Roaming', 'osu'),
+    join(home, 'AppData', 'Local', 'osu'),
+    join(home, 'AppData', 'Roaming', 'osulazer'),
+    join(home, 'AppData', 'Local', 'osulazer'),
+  ].filter((path) => existsSync(join(path, 'client.realm')) && existsSync(join(path, 'files')));
+}
+
 async function handleApi(req, res, url) {
   if (url.pathname === '/api/default-paths') {
-    return json(res, { osuSongs: likelyOsuPaths() });
+    return json(res, { osuSongs: likelyOsuPaths(), lazerRoots: likelyLazerPaths() });
   }
 
   if (url.pathname === '/api/scan') {
@@ -140,7 +274,11 @@ async function handleApi(req, res, url) {
     if (!folderPath || !existsSync(folderPath)) return json(res, { error: '文件夹不存在' }, 400);
     const info = await stat(folderPath);
     if (!info.isDirectory()) return json(res, { error: '路径不是文件夹' }, 400);
-    const tracks = kind === 'osu' ? await scanOsuSongs(folderPath) : await scanMusicFolder(folderPath);
+    const tracks = kind === 'osu'
+      ? await scanOsuSongs(folderPath)
+      : kind === 'lazer'
+        ? await scanLazerLibrary(folderPath)
+        : await scanMusicFolder(folderPath);
     return json(res, { tracks });
   }
 

@@ -160,6 +160,7 @@ const i18n = {
     folderPlaceholder: 'C:\\Users\\You\\AppData\\Local\\osu!\\Songs',
     detectOsu: '检测 osu!',
     scanOsu: '扫描 osu! Songs',
+    scanLazer: '扫描 osu!lazer',
     scanMusic: '扫描普通音乐',
     chooseSong: '选择歌曲',
     songs: '歌曲',
@@ -190,9 +191,12 @@ const i18n = {
     fountainSensitivity: '喷泉灵敏度',
     resetSettings: '重置所有参数',
     foundOsu: '找到 osu! Songs：{path}',
-    noOsu: '没有自动找到 osu! Songs。可以手动粘贴路径。',
+    foundLazer: '找到 osu!lazer 数据目录：{path}',
+    foundBothOsu: '找到 osu! Songs 和 osu!lazer，当前使用：{path}',
+    noOsu: '没有自动找到 osu! 或 osu!lazer。可以手动粘贴路径。',
     missingPath: '请先填写文件夹路径。',
     scanningOsu: '正在扫描 osu! 谱面...',
+    scanningLazer: '正在扫描 osu!lazer 曲库...',
     scanningMusic: '正在扫描普通音乐...',
     loadedTracks: '已载入 {count} 首歌曲，合并了 {duplicates} 个重复难度/重复音频。',
     noPlayable: '没有找到可播放音乐。',
@@ -238,6 +242,7 @@ const i18n = {
     folderPlaceholder: 'C:\\Users\\You\\AppData\\Local\\osu!\\Songs',
     detectOsu: 'Detect osu!',
     scanOsu: 'Scan osu! Songs',
+    scanLazer: 'Scan osu!lazer',
     scanMusic: 'Scan music folder',
     chooseSong: 'choose track',
     songs: 'Songs',
@@ -268,9 +273,12 @@ const i18n = {
     fountainSensitivity: 'Fountain sensitivity',
     resetSettings: 'Reset all parameters',
     foundOsu: 'Found osu! Songs: {path}',
-    noOsu: 'No osu! Songs folder was detected. You can paste a path manually.',
+    foundLazer: 'Found osu!lazer data: {path}',
+    foundBothOsu: 'Found osu! Songs and osu!lazer. Current path: {path}',
+    noOsu: 'No osu! or osu!lazer folder was detected. You can paste a path manually.',
     missingPath: 'Please enter a folder path first.',
     scanningOsu: 'Scanning osu! beatmaps...',
+    scanningLazer: 'Scanning osu!lazer library...',
     scanningMusic: 'Scanning local music...',
     loadedTracks: 'Loaded {count} songs and merged {duplicates} duplicate difficulties/audio files.',
     noPlayable: 'No playable music was found.',
@@ -591,7 +599,10 @@ async function detectOsu() {
   const data = await fetchJson('/api/default-paths');
   if (data.osuSongs?.length) {
     folderPath.value = data.osuSongs[0];
-    setStatusKey('foundOsu', { path: data.osuSongs[0] });
+    setStatusKey(data.lazerRoots?.length ? 'foundBothOsu' : 'foundOsu', { path: data.osuSongs[0] });
+  } else if (data.lazerRoots?.length) {
+    folderPath.value = data.lazerRoots[0];
+    setStatusKey('foundLazer', { path: data.lazerRoots[0] });
   } else {
     setStatusKey('noOsu');
   }
@@ -605,7 +616,7 @@ async function scan(kind) {
   }
 
   setPanel('scan');
-  setStatusKey(kind === 'osu' ? 'scanningOsu' : 'scanningMusic');
+  setStatusKey(kind === 'osu' ? 'scanningOsu' : kind === 'lazer' ? 'scanningLazer' : 'scanningMusic');
   tracks = [];
   visibleTracks = [];
   listEl.innerHTML = '';
@@ -1802,6 +1813,7 @@ document.querySelector('#close-library').addEventListener('click', () => setPane
 document.querySelector('#close-settings').addEventListener('click', () => setPanel('idle'));
 document.querySelector('#detect-osu').addEventListener('click', detectOsu);
 document.querySelector('#scan-osu').addEventListener('click', () => scan('osu'));
+document.querySelector('#scan-lazer').addEventListener('click', () => scan('lazer'));
 document.querySelector('#scan-music').addEventListener('click', () => scan('music'));
 document.querySelector('#prev').addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
 playButton.addEventListener('click', (event) => runTransport(event, togglePlay));
