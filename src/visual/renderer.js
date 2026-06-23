@@ -1138,6 +1138,16 @@ function osuSideAlpha(channel, kiai) {
   return Math.max(floor, Math.min(0.94, Math.max(originalAlpha, liftedAlpha))) * Math.max(0, settings.sideIntensity);
 }
 
+function sideBeatAlpha(kiai, strong) {
+  const activity = Math.max(lowEnergy, midEnergy * 0.82, smoothedEnergy, currentDrive * 0.76);
+  const lift = Math.max(0, activity - driveAverage);
+  const base = kiai ? 0.2 : 0.08;
+  const energyLift = Math.sqrt(Math.max(0, activity)) * (kiai ? 0.46 : 0.28);
+  const riseLift = Math.min(kiai ? 0.12 : 0.08, currentRise * 1.15 + lift * 0.42);
+  const accent = strong ? 0.13 : 0;
+  return Math.min(0.92, base + energyLift + riseLift + accent) * Math.max(0, settings.sideIntensity);
+}
+
 function beatIndexAtTimeMs(currentTrackTime, point) {
   const beatLengthMs = point.beatLength || 1;
   let index = Math.trunc((currentTrackTime - point.offset) / beatLengthMs);
@@ -1195,17 +1205,18 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
   const lift = Math.max(0, activity - driveAverage);
   const percussivePresence = Math.max(lowEnergy * 1.1, currentRise * 2.35, Math.max(0, currentDrive - driveAverage) * 1.45);
   const strongRise = currentRise > Math.max(0.055, riseAverage * (2.25 - settings.sideRestraint * 0.55));
-  const hasDrumLikeEnergy = percussivePresence > 0.13 + settings.sideRestraint * 0.09;
-  const strongMoment = downbeat && hasDrumLikeEnergy && (kiaiTagged || activity > 0.36 + settings.sideRestraint * 0.12 || lift > 0.1 || strongRise);
-  if (!hasDrumLikeEnergy && !kiaiTagged) return;
+  const hasDrumLikeEnergy = percussivePresence > 0.16 + settings.sideRestraint * 0.11;
+  const audibleBeat = activity > 0.22 + settings.sideRestraint * 0.08 || lift > 0.075 || strongRise;
+  const strongMoment = downbeat && hasDrumLikeEnergy && (kiaiTagged || activity > 0.38 + settings.sideRestraint * 0.12 || lift > 0.11 || strongRise);
+  if (!hasDrumLikeEnergy && !audibleBeat) return;
 
   if (kiaiTagged) {
+    if (!hasDrumLikeEnergy && activity < 0.28 + settings.sideRestraint * 0.08 && !strongRise) return;
     const layer = strongMoment || downbeat ? 'hard' : 'soft';
+    const amount = sideBeatAlpha(true, layer === 'hard') * (layer === 'hard' ? 1 : 0.76);
     if (beatIndex % 2 === 0) {
-      const amount = osuSideAlpha(leftEnergy, true) * (layer === 'hard' ? 1 : 0.74);
       flashSide('left', amount, layer, `kiai-${layer}-left`, beatIndex, timeSinceBeat);
     } else {
-      const amount = osuSideAlpha(rightEnergy, true) * (layer === 'hard' ? 1 : 0.74);
       flashSide('right', amount, layer, `kiai-${layer}-right`, beatIndex, timeSinceBeat);
     }
 
@@ -1217,10 +1228,9 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
   const enoughPresence = (activity > 0.28 + settings.sideRestraint * 0.18 && hasDrumLikeEnergy) || (strongRise && percussivePresence > 0.18);
   if (!enoughPresence) return;
 
-  const leftAmount = osuSideAlpha(leftEnergy, false);
-  const rightAmount = osuSideAlpha(rightEnergy, false);
   const layer = strongMoment ? 'hard' : 'soft';
-  if (flashSide('both', Math.max(leftAmount, rightAmount) * (layer === 'hard' ? 0.88 : 0.66), layer, `normal-downbeat-both-${layer}`, beatIndex, timeSinceBeat)) {
+  const amount = sideBeatAlpha(false, layer === 'hard') * (layer === 'hard' ? 0.88 : 0.66);
+  if (flashSide('both', amount, layer, `normal-downbeat-both-${layer}`, beatIndex, timeSinceBeat)) {
     sideMode = 'both';
     sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * Math.max(1.25, meter * 0.62));
   }
@@ -1324,12 +1334,12 @@ function updateLogoAmplitudes(now, elapsed) {
   lastVisualizerUpdate = now;
 
   const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
-  const dynamicRange = 0.08 + Math.max(0.04, amplitudeAverage) * 1.05;
-  const userScale = 0.66 + Math.max(0, settings.visualizer) * 0.34;
-  const noiseFloor = Math.max(0.034, amplitudeAverage * 0.28);
+  const dynamicRange = 0.1 + Math.max(0.04, amplitudeAverage) * 1.08;
+  const userScale = 0.6 + Math.max(0, settings.visualizer) * 0.32;
+  const noiseFloor = Math.max(0.03, amplitudeAverage * 0.25);
   const contrast = Math.max(0.1, settings.visualizerContrast || 1.6);
   const startupLimiter = Math.min(1, Math.max(0.18, (audio.currentTime || 0) / 2.8));
-  const attackLimit = (0.028 + Math.min(0.09, audioAmplitude * 0.11)) * (activeEffectPoint?.kiai ? 1.25 : 1);
+  const attackLimit = (0.022 + Math.min(0.075, audioAmplitude * 0.09)) * (activeEffectPoint?.kiai ? 1.18 : 1);
   const candidates = [];
 
   for (let i = 0; i < visualizerBars.length; i += 1) {
@@ -1338,23 +1348,31 @@ function updateLogoAmplitudes(now, elapsed) {
     const prev = (freqData[(sourceIndex + freqData.length - 2) % freqData.length] || 0) / 255;
     const next = (freqData[(sourceIndex + 2) % freqData.length] || 0) / 255;
     const localAverage = (prev + next) * 0.5;
-    const localPeak = raw > prev * 1.04 && raw >= next * 0.98;
+    const localPeak = raw > prev * 1.018 && raw >= next * 0.965;
     const freshLift = Math.max(0, raw - previousVisualizerBins[i]);
-    const peak = Math.max(0, raw - localAverage * 0.72 - noiseFloor + freshLift * 0.42);
+    const spectralLift = Math.max(0, raw - localAverage * 0.52);
+    const peak = Math.max(0, spectralLift - noiseFloor + freshLift * 0.36);
     previousVisualizerBins[i] = raw;
-    if (!localPeak || peak <= 0) continue;
+    if ((!localPeak && freshLift < 0.035) || peak <= 0) continue;
     const normalised = peak / dynamicRange;
     const compressed = Math.min(1, normalised);
-    const shaped = Math.pow(compressed, contrast);
-    const target = Math.min(0.82, shaped * (0.42 + contrast * 0.12) * kiaiMultiplier * userScale * startupLimiter);
+    const shaped = Math.pow(compressed, contrast * 0.9);
+    const target = Math.min(0.76, shaped * (0.4 + contrast * 0.1) * kiaiMultiplier * userScale * startupLimiter);
     if (target > visualizerBars[i]) candidates.push({ index: i, target, score: target + freshLift * 0.5 });
   }
 
   candidates
     .sort((a, b) => b.score - a.score)
-    .slice(0, activeEffectPoint?.kiai ? 34 : 24)
+    .slice(0, activeEffectPoint?.kiai ? 44 : 32)
     .forEach(({ index, target }) => {
-      visualizerBars[index] = Math.min(target, visualizerBars[index] + attackLimit);
+      for (let spread = -2; spread <= 2; spread += 1) {
+        const wrapped = (index + spread + visualizerBars.length) % visualizerBars.length;
+        const falloff = spread === 0 ? 1 : spread === -1 || spread === 1 ? 0.54 : 0.24;
+        const spreadTarget = target * falloff;
+        if (spreadTarget > visualizerBars[wrapped]) {
+          visualizerBars[wrapped] = Math.min(spreadTarget, visualizerBars[wrapped] + attackLimit * falloff);
+        }
+      }
     });
 
   for (let i = 1; i < visualizerBars.length - 1; i += 1) {
