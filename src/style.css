@@ -89,6 +89,9 @@ button:hover,
 
 #background {
   z-index: 0;
+  inset: -10vmax;
+  width: auto;
+  height: auto;
   overflow: hidden;
   background:
     radial-gradient(circle at calc(24% + var(--ambient-energy) * 8%) calc(18% + var(--ambient-energy) * 6%), rgba(var(--ambient-a), 0.82), transparent 34rem),
@@ -596,6 +599,7 @@ button:hover,
   width: min(470px, calc(100vw - 48px));
   max-height: none;
   padding: 18px 20px;
+  min-height: 0;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   background: linear-gradient(115deg, rgba(255, 75, 172, 0.16), rgba(12, 8, 20, 0.78) 22%, rgba(12, 8, 20, 0.7));
@@ -629,6 +633,12 @@ button:hover,
 .song-panel,
 .settings-panel {
   transform: translateX(24px) scale(0.98);
+}
+
+.song-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .app[data-panel="scan"] .scan-panel {
@@ -762,7 +772,9 @@ select {
 }
 
 .track-list {
-  max-height: calc(min(76vh, 720px) - 104px);
+  flex: 1;
+  min-height: 120px;
+  max-height: none;
   overflow: auto;
   padding: 4px 16px 4px 0;
 }

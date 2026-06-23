@@ -114,6 +114,8 @@ let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
 let lastAudioFountainAt = -10000;
 let ambientToken = 0;
+let sideMode = 'idle';
+let sideModeUntil = 0;
 const cssVarCache = new Map();
 const textCache = new WeakMap();
 
@@ -604,7 +606,7 @@ async function detectOsu() {
     folderPath.value = data.lazerRoots[0];
     setStatusKey('foundLazer', { path: data.lazerRoots[0] });
   } else {
-    setStatusKey('noOsu');
+    setStatus(data.guidance?.message || text('noOsu'));
   }
 }
 
@@ -915,6 +917,8 @@ async function playIndex(index) {
   coreGhostScale = 1;
   calmWindow = 0;
   scytheEvents = [];
+  sideMode = 'idle';
+  sideModeUntil = 0;
   starParticles = [];
   fountainBursts = [];
   rippleRings = [];
@@ -1141,6 +1145,10 @@ function flashSide(side, amount, layer = 'soft', reason = 'beat', beatIndex = la
   const now = performance.now();
   const startedAt = now - Math.max(0, timeSinceBeat);
   const hard = layer === 'hard';
+  const mode = side === 'both' ? 'both' : 'alternate';
+  if (sideMode !== 'idle' && sideMode !== mode && now < sideModeUntil) return;
+  sideMode = mode;
+  sideModeUntil = now + Math.max(260, (currentBeatLengthMs || 620) * (hard ? 0.92 : 0.74));
   const makeEnvelope = (existing) => ({
     start: startedAt,
     peak: Math.max(clamped, envelopeValue(existing, now) * 0.9),
@@ -1173,10 +1181,19 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
   const downbeat = beatIndex % Math.max(1, meter) === 0;
   const activity = Math.max(lowEnergy, midEnergy * 0.82, smoothedEnergy, currentDrive * 0.72);
   const lift = Math.max(0, activity - driveAverage);
+  const percussivePresence = Math.max(lowEnergy * 1.1, currentRise * 2.35, Math.max(0, currentDrive - driveAverage) * 1.45);
   const strongRise = currentRise > Math.max(0.055, riseAverage * (2.25 - settings.sideRestraint * 0.55));
-  const strongMoment = downbeat && (kiaiTagged || activity > 0.36 + settings.sideRestraint * 0.12 || lift > 0.1 || strongRise);
+  const hasDrumLikeEnergy = percussivePresence > 0.13 + settings.sideRestraint * 0.09;
+  const strongMoment = downbeat && hasDrumLikeEnergy && (kiaiTagged || activity > 0.36 + settings.sideRestraint * 0.12 || lift > 0.1 || strongRise);
+  if (!hasDrumLikeEnergy && !kiaiTagged) return;
 
   if (kiaiTagged) {
+    if (strongMoment) {
+      const bothAmount = Math.max(osuSideAlpha(leftEnergy, true), osuSideAlpha(rightEnergy, true)) * 0.76;
+      flashSide('both', bothAmount, 'hard', 'kiai-downbeat-both', beatIndex, timeSinceBeat);
+      return;
+    }
+
     const layer = strongMoment ? 'hard' : 'soft';
     if (beatIndex % 2 === 0) {
       const amount = osuSideAlpha(leftEnergy, true) * (layer === 'hard' ? 1 : 0.68);
@@ -1186,16 +1203,12 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
       flashSide('right', amount, layer, `kiai-${layer}-right`, beatIndex, timeSinceBeat);
     }
 
-    if (strongMoment) {
-      const bothAmount = Math.max(osuSideAlpha(leftEnergy, true), osuSideAlpha(rightEnergy, true)) * 0.76;
-      flashSide('both', bothAmount, 'hard', 'kiai-downbeat-both', beatIndex, timeSinceBeat);
-    }
     return;
   }
 
   if (!downbeat && !(strongRise && activity > 0.31 + settings.sideRestraint * 0.08)) return;
 
-  const enoughPresence = activity > 0.24 + settings.sideRestraint * 0.18 || strongRise;
+  const enoughPresence = (activity > 0.28 + settings.sideRestraint * 0.18 && hasDrumLikeEnergy) || (strongRise && percussivePresence > 0.18);
   if (!enoughPresence) return;
 
   const layer = strongMoment ? 'hard' : 'soft';
@@ -1798,8 +1811,17 @@ window.visualViewport?.addEventListener('scroll', resize);
 window.addEventListener('pointermove', (event) => {
   pointerX = event.clientX;
   pointerY = event.clientY;
-  touch();
+  const { height } = readStageSize();
+  if (event.clientY <= height * 0.2 || app.dataset.panel !== 'idle') touch();
 }, { passive: true });
+let lastLayoutSignature = '';
+setInterval(() => {
+  const { width, height } = readStageSize();
+  const signature = `${Math.round(width)}x${Math.round(height)}:${app.dataset.panel}`;
+  if (signature === lastLayoutSignature) return;
+  lastLayoutSignature = signature;
+  resize();
+}, 500);
 window.addEventListener('keydown', () => touch());
 core.addEventListener('click', () => setPanel(app.dataset.panel === 'controls' ? 'idle' : 'controls'));
 core.addEventListener('pointerenter', () => {

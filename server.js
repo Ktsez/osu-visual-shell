@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
-import { opendir, readFile, stat } from 'node:fs/promises';
+import { open, opendir, readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { homedir } from 'node:os';
+import { homedir, platform, release } from 'node:os';
 import { parseOsuFile } from './src/server/parseOsuFile.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -133,6 +133,45 @@ function classifyStoredFile(buffer) {
   return 'other';
 }
 
+function normaliseSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\u3040-\u30ff\u3400-\u9fff]+/g, ' ')
+    .trim();
+}
+
+function meaningfulTokens(...values) {
+  return [...new Set(values
+    .flatMap((value) => normaliseSearchText(value).split(/\s+/))
+    .filter((token) => token.length >= 3 && !['feat', 'with', 'remix', 'short', 'version', 'original'].includes(token)))];
+}
+
+function audioMetadataText(buffer) {
+  const slice = buffer.subarray(0, Math.min(buffer.length, 220000));
+  return `${slice.toString('utf8')} ${slice.toString('utf16le')}`
+    .replace(/[^\x20-\x7E\u3040-\u30ff\u3400-\u9fff]+/g, ' ')
+    .slice(0, 8000);
+}
+
+function metadataSimilarity(parsed, item) {
+  const haystack = item.searchText || normaliseSearchText(item.metaText || '');
+  if (!haystack) return { score: 0, tagged: false };
+  const title = normaliseSearchText(parsed.title);
+  const artist = normaliseSearchText(parsed.artist);
+  const tokens = meaningfulTokens(parsed.title, parsed.artist, parsed.titleUnicode, parsed.artistUnicode);
+  let score = 0;
+  if (title && title.length >= 4 && haystack.includes(title)) score += 0.72;
+  if (artist && artist.length >= 3 && haystack.includes(artist)) score += 0.38;
+  const tokenHits = tokens.filter((token) => haystack.includes(token)).length;
+  score += Math.min(0.62, tokenHits * 0.16);
+  return {
+    score: Math.min(1, score),
+    tagged: /tit2|tpe1|talb|artist|title|vorbis|xiph|album/i.test(item.metaText || ''),
+  };
+}
+
 function resolveLazerRoot(inputPath) {
   const resolved = resolve(inputPath);
   if (basename(resolved).toLowerCase() === 'files' && existsSync(join(dirname(resolved), 'client.realm'))) {
@@ -143,6 +182,18 @@ function resolveLazerRoot(inputPath) {
 
 async function collectLazerFiles(filesPath) {
   const items = [];
+  const filePaths = [];
+
+  async function readHead(filePath, length = 8192) {
+    const handle = await open(filePath, 'r');
+    try {
+      const buffer = Buffer.alloc(length);
+      const { bytesRead } = await handle.read(buffer, 0, length, 0);
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      await handle.close();
+    }
+  }
 
   async function walk(dir, depth = 0) {
     if (depth > 3) return;
@@ -160,35 +211,69 @@ async function collectLazerFiles(filesPath) {
         continue;
       }
       if (!entry.isFile() || !/^[a-f0-9]{64}$/i.test(entry.name)) continue;
+      filePaths.push(fullPath);
+    }
+  }
 
-      try {
-        const [buffer, info] = await Promise.all([readFile(fullPath), stat(fullPath)]);
-        const kind = classifyStoredFile(buffer);
-        if (kind === 'other') continue;
-        items.push({
-          hash: entry.name.toLowerCase(),
-          path: fullPath,
-          kind,
-          size: info.size,
-          mtime: info.mtimeMs,
-          text: kind === 'osu' ? buffer.toString('utf8') : '',
-        });
-      } catch {
-        continue;
-      }
+  async function processFile(fullPath) {
+    try {
+      const [head, info] = await Promise.all([readHead(fullPath), stat(fullPath)]);
+      const kind = classifyStoredFile(head);
+      if (kind === 'other') return;
+      const text = kind === 'osu' ? await readFile(fullPath, 'utf8') : '';
+      const metaHead = kind === 'audio' ? await readHead(fullPath, 65536) : null;
+      const metaText = metaHead ? audioMetadataText(metaHead) : '';
+      items.push({
+        hash: basename(fullPath).toLowerCase(),
+        path: fullPath,
+        kind,
+        size: info.size,
+        mtime: info.mtimeMs,
+        text,
+        metaText,
+        searchText: metaText ? normaliseSearchText(metaText) : '',
+      });
+    } catch {
+      // Ignore unreadable files. Lazer can keep transient files while running.
     }
   }
 
   await walk(filesPath);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(48, Math.max(1, filePaths.length)) }, async () => {
+    while (nextIndex < filePaths.length) {
+      const current = filePaths[nextIndex];
+      nextIndex += 1;
+      await processFile(current);
+    }
+  });
+  await Promise.all(workers);
   return items;
 }
 
-function nearestAudio(osuItem, audioItems) {
+function nearestAudio(osuItem, audioItems, parsed) {
   const candidates = audioItems
-    .map((item) => ({ item, distance: Math.abs(item.mtime - osuItem.mtime) }))
-    .filter(({ item, distance }) => item.size > 220000 && distance < 5000)
-    .sort((a, b) => a.distance - b.distance);
-  return candidates[0]?.item || null;
+    .filter((item) => {
+      const distance = Math.abs(item.mtime - osuItem.mtime);
+      return item.size > 220000 && distance < 90000;
+    })
+    .map((item) => {
+      const distance = Math.abs(item.mtime - osuItem.mtime);
+      const similarity = metadataSimilarity(parsed, item);
+      return {
+        item,
+        distance,
+        similarity,
+        score: distance / 1000 - similarity.score * 7,
+      };
+    })
+    .sort((a, b) => b.similarity.score - a.similarity.score || a.score - b.score);
+  const taggedMatch = candidates.find(({ similarity }) => similarity.score >= 0.42);
+  if (taggedMatch) return taggedMatch.item;
+  const nearUntagged = candidates.find(({ distance, similarity }) => distance < 140 && !similarity.tagged);
+  if (nearUntagged) return nearUntagged.item;
+  const veryNear = candidates.find(({ distance, similarity }) => distance < 75 && similarity.score > 0.08);
+  return veryNear?.item || null;
 }
 
 function nearestBackground(osuItem, imageItems) {
@@ -220,7 +305,7 @@ async function scanLazerLibrary(lazerPath) {
     if (entries.length >= 1500) break;
     try {
       const parsed = parseOsuFile(item.text, '');
-      const audio = nearestAudio(item, audioItems);
+      const audio = nearestAudio(item, audioItems, parsed);
       if (!audio) continue;
       const background = nearestBackground(item, imageItems);
       entries.push({
@@ -244,28 +329,112 @@ async function scanLazerLibrary(lazerPath) {
   return entries;
 }
 
+function uniqueExisting(paths, predicate = existsSync) {
+  const seen = new Set();
+  const result = [];
+  for (const candidate of paths.filter(Boolean)) {
+    const resolved = resolve(candidate);
+    const key = resolved.toLowerCase();
+    if (seen.has(key) || !predicate(resolved)) continue;
+    seen.add(key);
+    result.push(resolved);
+  }
+  return result;
+}
+
+function windowsDriveRoots() {
+  const roots = [];
+  for (let code = 67; code <= 90; code += 1) {
+    const rootPath = `${String.fromCharCode(code)}:\\`;
+    if (existsSync(rootPath)) roots.push(rootPath);
+  }
+  return roots;
+}
+
 function likelyOsuPaths() {
   const home = homedir();
-  return [
+  const appData = process.env.APPDATA || join(home, 'AppData', 'Roaming');
+  const localAppData = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
+  const driveRoots = platform() === 'win32' ? windowsDriveRoots() : [];
+  const portableSongs = driveRoots.flatMap((drive) => [
+    join(drive, 'osu!', 'Songs'),
+    join(drive, 'osu', 'Songs'),
+    join(drive, 'Games', 'osu!', 'Songs'),
+    join(drive, 'Games', 'osu', 'Songs'),
+  ]);
+
+  return uniqueExisting([
     join(home, 'AppData', 'Local', 'osu!', 'Songs'),
     join(home, 'AppData', 'Roaming', 'osu!', 'Songs'),
+    join(localAppData, 'osu!', 'Songs'),
+    join(appData, 'osu!', 'Songs'),
     'C:\\osu!\\Songs',
-  ].filter((path) => existsSync(path));
+    ...portableSongs,
+    join(home, 'Library', 'Application Support', 'osu!', 'Songs'),
+    join(home, '.osu', 'Songs'),
+    join(home, 'osu!', 'Songs'),
+    join(home, 'Library', 'Application Support', 'CrossOver', 'Bottles', 'osu', 'drive_c', 'users', 'crossover', 'AppData', 'Local', 'osu!', 'Songs'),
+    join(home, 'Library', 'Application Support', 'Wine', 'prefixes', 'osu', 'drive_c', 'users', process.env.USER || 'user', 'AppData', 'Local', 'osu!', 'Songs'),
+  ]);
 }
 
 function likelyLazerPaths() {
   const home = homedir();
-  return [
+  const appData = process.env.APPDATA || join(home, 'AppData', 'Roaming');
+  const localAppData = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
+  const driveRoots = platform() === 'win32' ? windowsDriveRoots() : [];
+  const portableRoots = driveRoots.flatMap((drive) => [
+    join(drive, 'osu'),
+    join(drive, 'osulazer'),
+    join(drive, 'osu-lazer'),
+    join(drive, 'Games', 'osu'),
+    join(drive, 'Games', 'osulazer'),
+    join(drive, 'Games', 'osu-lazer'),
+  ]);
+
+  return uniqueExisting([
+    join(appData, 'osu'),
+    join(localAppData, 'osu'),
+    join(appData, 'osulazer'),
+    join(localAppData, 'osulazer'),
     join(home, 'AppData', 'Roaming', 'osu'),
     join(home, 'AppData', 'Local', 'osu'),
     join(home, 'AppData', 'Roaming', 'osulazer'),
     join(home, 'AppData', 'Local', 'osulazer'),
-  ].filter((path) => existsSync(join(path, 'client.realm')) && existsSync(join(path, 'files')));
+    join(home, 'Library', 'Application Support', 'osu'),
+    join(home, 'Library', 'Application Support', 'osu-lazer'),
+    join(home, 'Library', 'Containers', 'sh.ppy.osu', 'Data', 'Library', 'Application Support', 'osu'),
+    join(home, '.local', 'share', 'osu'),
+    ...portableRoots,
+  ], (path) => existsSync(join(path, 'client.realm')) && existsSync(join(path, 'files')));
+}
+
+function macPermissionGuidance() {
+  if (platform() !== 'darwin') return null;
+  const major = Number(release().split('.')[0] || 0);
+  const marketingVersion = major >= 25 ? 'macOS 16 或更新版本'
+    : major >= 24 ? 'macOS 15 Sequoia'
+      : major >= 23 ? 'macOS 14 Sonoma'
+        : major >= 22 ? 'macOS 13 Ventura'
+          : major >= 21 ? 'macOS 12 Monterey'
+            : '当前 macOS';
+  return {
+    platform: 'darwin',
+    release: release(),
+    version: marketingVersion,
+    message: `检测到 ${marketingVersion}。如果自动检测不到 osu!lazer，请在 Finder 使用“前往文件夹”打开 ~/Library/Application Support/osu，并确认里面有 client.realm 和 files。若数据放在 Documents/Desktop/Downloads 或外置盘，请到 系统设置 > 隐私与安全性 > 文件和文件夹 或 完全磁盘访问权限，允许当前终端/启动器读取该位置。`,
+  };
 }
 
 async function handleApi(req, res, url) {
   if (url.pathname === '/api/default-paths') {
-    return json(res, { osuSongs: likelyOsuPaths(), lazerRoots: likelyLazerPaths() });
+    return json(res, {
+      osuSongs: likelyOsuPaths(),
+      lazerRoots: likelyLazerPaths(),
+      platform: platform(),
+      release: release(),
+      guidance: macPermissionGuidance(),
+    });
   }
 
   if (url.pathname === '/api/scan') {
