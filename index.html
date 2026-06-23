@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>osu! 视觉播放器</title>
+    <title>osu! Visual Shell</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -12,7 +12,7 @@
     <div id="shade"></div>
 
     <main id="app" class="app" data-panel="idle">
-      <section class="visual" aria-label="视觉播放器">
+      <section class="visual" aria-label="视觉播放器" data-i18n-aria="appAria">
         <div class="scythe scythe-left" aria-hidden="true">
           <span class="side-glow side-glow-soft"></span>
           <span class="side-glow side-glow-hard"></span>
@@ -25,208 +25,236 @@
         <div class="halo halo-a"></div>
         <div class="halo halo-b"></div>
 
-        <div id="core" class="core" role="button" tabindex="0" aria-label="打开音乐控制">
+        <header id="top-bar" class="top-bar" aria-label="播放状态栏" data-i18n-aria="topBarAria">
+          <div class="top-now">
+            <span class="top-dot" aria-hidden="true"></span>
+            <div>
+              <p id="top-title" data-i18n="noTrack">未选择歌曲</p>
+              <p id="top-meta" data-i18n="scanPrompt">请先扫描本地曲库</p>
+            </div>
+          </div>
+          <div class="top-transport">
+            <button id="top-prev" type="button" class="top-icon" aria-label="上一首" data-i18n-aria="previous">‹</button>
+            <button id="top-play" type="button" class="top-play" data-i18n="play">播放</button>
+            <button id="top-next" type="button" class="top-icon" aria-label="下一首" data-i18n-aria="next">›</button>
+          </div>
+          <nav class="top-actions" aria-label="快捷操作" data-i18n-aria="quickActions">
+            <button id="top-scan" type="button" data-i18n="scan">扫描</button>
+            <button id="top-library" type="button" data-i18n="library">歌曲列表</button>
+            <button id="top-settings" type="button" data-i18n="settings">设置</button>
+          </nav>
+        </header>
+
+        <div id="core" class="core" role="button" tabindex="0" aria-label="打开音乐控制" data-i18n-aria="openControls">
           <span id="core-aura" class="core-aura" aria-hidden="true"></span>
           <span class="core-pulse-glow"></span>
           <span id="core-cover" class="core-cover"></span>
-          <span id="core-subtitle" class="core-subtitle">点击打开</span>
+          <span id="core-subtitle" class="core-subtitle" data-i18n="clickOpen">点击打开</span>
           <span class="core-mini">
-            <span id="mini-state">就绪</span>
+            <span id="mini-state" data-i18n="ready">就绪</span>
             <span id="mini-time">0:00</span>
           </span>
         </div>
 
-        <div id="control-panel" class="control-panel dock-panel" aria-label="音乐控制">
+        <div id="control-panel" class="control-panel dock-panel" aria-label="音乐控制" data-i18n-aria="musicControls">
           <div class="panel-title">
-            <p>音乐控制</p>
-            <button id="minimize-controls" type="button">最小化</button>
+            <p data-i18n="musicControls">音乐控制</p>
+            <button id="minimize-controls" type="button" data-i18n="minimize">最小化</button>
           </div>
           <div class="now">
             <div id="cover" class="cover"></div>
             <div>
-              <p id="track-title">未选择歌曲</p>
-              <p id="track-meta">请先扫描本地曲库</p>
+              <p id="track-title" data-i18n="noTrack">未选择歌曲</p>
+              <p id="track-meta" data-i18n="scanPrompt">请先扫描本地曲库</p>
             </div>
           </div>
 
-          <input id="progress" class="progress" type="range" min="0" max="1000" value="0" aria-label="歌曲进度" />
+          <input id="progress" class="progress" type="range" min="0" max="1000" value="0" aria-label="歌曲进度" data-i18n-aria="progress" />
           <div class="time-row">
             <span id="time-current">0:00</span>
             <span id="time-total">0:00</span>
           </div>
 
           <div class="transport">
-            <button id="prev" type="button">上一首</button>
-            <button id="toggle-play" type="button">播放</button>
-            <button id="next" type="button">下一首</button>
+            <button id="prev" type="button" data-i18n="previous">上一首</button>
+            <button id="toggle-play" type="button" data-i18n="play">播放</button>
+            <button id="next" type="button" data-i18n="next">下一首</button>
           </div>
 
           <div class="orbit-actions">
-            <button id="open-scan" type="button">扫描</button>
-            <button id="open-library" type="button">歌曲列表</button>
-            <button id="open-settings" type="button">设置</button>
+            <button id="open-scan" type="button" data-i18n="scan">扫描</button>
+            <button id="open-library" type="button" data-i18n="library">歌曲列表</button>
+            <button id="open-settings" type="button" data-i18n="settings">设置</button>
           </div>
 
-          <p id="status" class="status">就绪。可以检测本地 osu! Songs。</p>
+          <p id="status" class="status" data-i18n="readyStatus">就绪。可以检测本地 osu! Songs。</p>
         </div>
 
-        <section id="scan-panel" class="float-panel scan-panel wedge-panel" aria-label="扫描文件夹">
+        <section id="scan-panel" class="float-panel scan-panel wedge-panel" aria-label="扫描文件夹" data-i18n-aria="scanFolder">
           <div class="panel-title">
-            <p>曲库来源</p>
-            <button id="close-scan" type="button">关闭</button>
+            <p data-i18n="librarySource">曲库来源</p>
+            <button id="close-scan" type="button" data-i18n="close">关闭</button>
           </div>
           <label>
-            <span>文件夹路径</span>
-            <input id="folder-path" placeholder="C:\Users\You\AppData\Local\osu!\Songs" />
+            <span data-i18n="folderPath">文件夹路径</span>
+            <input id="folder-path" placeholder="C:\Users\You\AppData\Local\osu!\Songs" data-i18n-placeholder="folderPlaceholder" />
           </label>
           <div class="scan-actions">
-            <button id="detect-osu" type="button">检测 osu!</button>
-            <button id="scan-osu" type="button">扫描 osu! Songs</button>
-            <button id="scan-music" type="button">扫描普通音乐</button>
+            <button id="detect-osu" type="button" data-i18n="detectOsu">检测 osu!</button>
+            <button id="scan-osu" type="button" data-i18n="scanOsu">扫描 osu! Songs</button>
+            <button id="scan-music" type="button" data-i18n="scanMusic">扫描普通音乐</button>
           </div>
         </section>
 
-        <section id="song-panel" class="float-panel song-panel wedge-panel" aria-label="选择歌曲">
+        <section id="song-panel" class="float-panel song-panel wedge-panel" aria-label="选择歌曲" data-i18n-aria="chooseSong">
           <div class="panel-title">
-            <p id="song-count">歌曲</p>
-            <button id="close-library" type="button">关闭</button>
+            <p id="song-count" data-i18n="songs">歌曲</p>
+            <button id="close-library" type="button" data-i18n="close">关闭</button>
           </div>
-          <input id="search" class="search" placeholder="筛选歌曲" />
-          <div id="list" class="track-list" aria-label="歌曲列表"></div>
+          <input id="search" class="search" placeholder="筛选歌曲" data-i18n-placeholder="filterSongs" />
+          <div id="list" class="track-list" aria-label="歌曲列表" data-i18n-aria="songList"></div>
         </section>
 
-        <section id="settings-panel" class="float-panel settings-panel wedge-panel" aria-label="视觉设置">
+        <section id="settings-panel" class="float-panel settings-panel wedge-panel" aria-label="视觉设置" data-i18n-aria="visualSettings">
           <div class="panel-title">
-            <p>视觉设置</p>
-            <button id="close-settings" type="button">关闭</button>
+            <p data-i18n="visualSettings">视觉设置</p>
+            <button id="close-settings" type="button" data-i18n="close">关闭</button>
           </div>
+          <label class="language-setting">
+            <span data-i18n="language">语言</span>
+            <select id="language-select">
+              <option value="auto" data-i18n="languageAuto">自动</option>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
           <label>
-            <span>侧灯强度</span>
+            <span data-i18n="sideIntensity">侧灯强度</span>
             <div class="setting-control">
               <input id="setting-side-intensity" data-setting="sideIntensity" type="range" min="-2" max="4" step="0.05" value="1" />
               <input class="setting-number" data-setting-number="sideIntensity" type="number" min="-2" max="4" step="0.1" value="1.0" />
             </div>
           </label>
           <label>
-            <span>侧灯克制</span>
+            <span data-i18n="sideRestraint">侧灯克制</span>
             <div class="setting-control">
               <input id="setting-side-restraint" data-setting="sideRestraint" type="range" min="-2" max="4" step="0.05" value="1" />
               <input class="setting-number" data-setting-number="sideRestraint" type="number" min="-2" max="4" step="0.1" value="1.0" />
             </div>
           </label>
           <label>
-            <span>圆盘律动</span>
+            <span data-i18n="pulse">圆盘律动</span>
             <div class="setting-control">
               <input id="setting-pulse" data-setting="pulse" type="range" min="-1.4" max="4.6" step="0.05" value="1.6" />
               <input class="setting-number" data-setting-number="pulse" type="number" min="-1.4" max="4.6" step="0.1" value="1.6" />
             </div>
           </label>
           <label>
-            <span>圆盘光晕强度</span>
+            <span data-i18n="coreGlow">圆盘光晕强度</span>
             <div class="setting-control">
               <input id="setting-core-glow" data-setting="coreGlow" type="range" min="-2.4" max="3.6" step="0.05" value="0.6" />
               <input class="setting-number" data-setting-number="coreGlow" type="number" min="-2.4" max="3.6" step="0.1" value="0.6" />
             </div>
           </label>
           <label>
-            <span>圆盘光晕颜色</span>
+            <span data-i18n="coreGlowColor">圆盘光晕颜色</span>
             <div class="setting-control">
               <input id="setting-core-glow-color" class="setting-color" data-setting-color="coreGlowColor" type="color" value="#ffffff" />
               <span class="setting-color-value" data-setting-color-value="coreGlowColor">#ffffff</span>
             </div>
           </label>
           <label>
-            <span>圆盘留影强度</span>
+            <span data-i18n="ghostIntensity">圆盘留影强度</span>
             <div class="setting-control">
               <input id="setting-ghost-intensity" data-setting="ghostIntensity" type="range" min="-2.2" max="3.8" step="0.05" value="0.8" />
               <input class="setting-number" data-setting-number="ghostIntensity" type="number" min="-2.2" max="3.8" step="0.1" value="0.8" />
             </div>
           </label>
           <label>
-            <span>圆盘留影大小</span>
+            <span data-i18n="ghostSize">圆盘留影大小</span>
             <div class="setting-control">
               <input id="setting-ghost-size" data-setting="ghostSize" type="range" min="-3" max="3" step="0.01" value="0" />
               <input class="setting-number" data-setting-number="ghostSize" type="number" min="-3" max="3" step="0.01" value="0.00" data-precision="2" />
             </div>
           </label>
           <label>
-            <span>圆盘留影延迟</span>
+            <span data-i18n="ghostLag">圆盘留影延迟</span>
             <div class="setting-control">
               <input id="setting-ghost-lag" data-setting="ghostLag" type="range" min="-2.9" max="3.1" step="0.05" value="0.1" />
               <input class="setting-number" data-setting-number="ghostLag" type="number" min="-2.9" max="3.1" step="0.1" value="0.1" />
             </div>
           </label>
           <label>
-            <span>圆盘留影虚化</span>
+            <span data-i18n="ghostBlur">圆盘留影虚化</span>
             <div class="setting-control">
               <input id="setting-ghost-blur" data-setting="ghostBlur" type="range" min="-2.9" max="3.1" step="0.05" value="0.1" />
               <input class="setting-number" data-setting-number="ghostBlur" type="number" min="-2.9" max="3.1" step="0.1" value="0.1" />
             </div>
           </label>
           <label>
-            <span>能量柱长度</span>
+            <span data-i18n="visualizer">能量柱长度</span>
             <div class="setting-control">
               <input id="setting-visualizer" data-setting="visualizer" type="range" min="2.4" max="8.4" step="0.05" value="5.4" />
               <input class="setting-number" data-setting-number="visualizer" type="number" min="2.4" max="8.4" step="0.1" value="5.4" />
             </div>
           </label>
           <label>
-            <span>能量柱范围</span>
+            <span data-i18n="visualizerRange">能量柱范围</span>
             <div class="setting-control">
               <input id="setting-visualizer-range" data-setting="visualizerRange" type="range" min="-0.4" max="5.6" step="0.05" value="2.6" />
               <input class="setting-number" data-setting-number="visualizerRange" type="number" min="-0.4" max="5.6" step="0.1" value="2.6" />
             </div>
           </label>
           <label>
-            <span>能量柱比例</span>
+            <span data-i18n="visualizerContrast">能量柱比例</span>
             <div class="setting-control">
               <input id="setting-visualizer-contrast" data-setting="visualizerContrast" type="range" min="-1.8" max="4.2" step="0.05" value="1.2" />
               <input class="setting-number" data-setting-number="visualizerContrast" type="number" min="-1.8" max="4.2" step="0.1" value="1.2" />
             </div>
           </label>
           <label>
-            <span>能量柱缓降</span>
+            <span data-i18n="visualizerDecay">能量柱缓降</span>
             <div class="setting-control">
               <input id="setting-visualizer-decay" data-setting="visualizerDecay" type="range" min="-1.7" max="4.3" step="0.05" value="1.3" />
               <input class="setting-number" data-setting-number="visualizerDecay" type="number" min="-1.7" max="4.3" step="0.1" value="1.3" />
             </div>
           </label>
           <label>
-            <span>冲击波大小</span>
+            <span data-i18n="waveSize">冲击波大小</span>
             <div class="setting-control">
               <input id="setting-wave-size" data-setting="waveSize" type="range" min="-2.2" max="3.8" step="0.05" value="0.8" />
               <input class="setting-number" data-setting-number="waveSize" type="number" min="-2.2" max="3.8" step="0.1" value="0.8" />
             </div>
           </label>
           <label>
-            <span>冲击波强度</span>
+            <span data-i18n="waveIntensity">冲击波强度</span>
             <div class="setting-control">
               <input id="setting-wave-intensity" data-setting="waveIntensity" type="range" min="-1" max="5" step="0.05" value="2" />
               <input class="setting-number" data-setting-number="waveIntensity" type="number" min="-1" max="5" step="0.1" value="2.0" />
             </div>
           </label>
           <label>
-            <span>星星喷泉</span>
+            <span data-i18n="fountain">星星喷泉</span>
             <div class="setting-control">
               <input id="setting-fountain" data-setting="fountain" type="range" min="-1.4" max="4.6" step="0.05" value="1.6" />
               <input class="setting-number" data-setting-number="fountain" type="number" min="-1.4" max="4.6" step="0.1" value="1.6" />
             </div>
           </label>
           <label>
-            <span>星星光晕</span>
+            <span data-i18n="starGlow">星星光晕</span>
             <div class="setting-control">
               <input id="setting-star-glow" data-setting="starGlow" type="range" min="-2.5" max="3.5" step="0.05" value="0.5" />
               <input class="setting-number" data-setting-number="starGlow" type="number" min="-2.5" max="3.5" step="0.1" value="0.5" />
             </div>
           </label>
           <label>
-            <span>喷泉灵敏度</span>
+            <span data-i18n="fountainSensitivity">喷泉灵敏度</span>
             <div class="setting-control">
               <input id="setting-fountain-sensitivity" data-setting="fountainSensitivity" type="range" min="0.1" max="6.1" step="0.05" value="3.1" />
               <input class="setting-number" data-setting-number="fountainSensitivity" type="number" min="0.1" max="6.1" step="0.1" value="3.1" />
             </div>
           </label>
-          <button id="reset-settings" class="reset-settings" type="button">重置所有参数</button>
+          <button id="reset-settings" class="reset-settings" type="button" data-i18n="resetSettings">重置所有参数</button>
         </section>
       </section>
     </main>

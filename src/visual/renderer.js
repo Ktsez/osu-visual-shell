@@ -35,6 +35,10 @@ const settingsNumberInputs = Object.fromEntries([...document.querySelectorAll('[
 const settingsColorInputs = Object.fromEntries([...document.querySelectorAll('[data-setting-color]')].map((input) => [input.dataset.settingColor, input]));
 const settingsColorValues = Object.fromEntries([...document.querySelectorAll('[data-setting-color-value]')].map((item) => [item.dataset.settingColorValue, item]));
 const resetSettingsButton = document.querySelector('#reset-settings');
+const languageSelect = document.querySelector('#language-select');
+const topTitle = document.querySelector('#top-title');
+const topMeta = document.querySelector('#top-meta');
+const topPlayButton = document.querySelector('#top-play');
 
 let tracks = [];
 let visibleTracks = [];
@@ -119,6 +123,167 @@ const maxStarSpawnsPerFrame = 18;
 const starPath = createStarPath();
 const hollowStarPath = createStarPath(0.58);
 const settings = { ...defaultSettings };
+let activeLanguage = 'zh';
+let statusState = { key: 'readyStatus', values: {} };
+
+const i18n = {
+  zh: {
+    appTitle: 'osu! 视觉播放器',
+    appAria: '视觉播放器',
+    topBarAria: '播放状态栏',
+    quickActions: '快捷操作',
+    openControls: '打开音乐控制',
+    musicControls: '音乐控制',
+    clickOpen: '点击打开',
+    ready: '就绪',
+    loading: '已载入',
+    playing: '播放中',
+    paused: '已暂停',
+    waiting: '待播放',
+    noTrack: '未选择歌曲',
+    scanPrompt: '请先扫描本地曲库',
+    minimize: '最小化',
+    previous: '上一首',
+    play: '播放',
+    pause: '暂停',
+    next: '下一首',
+    scan: '扫描',
+    library: '歌曲列表',
+    settings: '设置',
+    progress: '歌曲进度',
+    readyStatus: '就绪。可以检测本地 osu! Songs。',
+    scanFolder: '扫描文件夹',
+    librarySource: '曲库来源',
+    close: '关闭',
+    folderPath: '文件夹路径',
+    folderPlaceholder: 'C:\\Users\\You\\AppData\\Local\\osu!\\Songs',
+    detectOsu: '检测 osu!',
+    scanOsu: '扫描 osu! Songs',
+    scanMusic: '扫描普通音乐',
+    chooseSong: '选择歌曲',
+    songs: '歌曲',
+    songCount: '{count} 首',
+    scanning: '扫描中',
+    filterSongs: '筛选歌曲',
+    songList: '歌曲列表',
+    visualSettings: '视觉设置',
+    language: '语言',
+    languageAuto: '自动',
+    sideIntensity: '侧灯强度',
+    sideRestraint: '侧灯克制',
+    pulse: '圆盘律动',
+    coreGlow: '圆盘光晕强度',
+    coreGlowColor: '圆盘光晕颜色',
+    ghostIntensity: '圆盘留影强度',
+    ghostSize: '圆盘留影大小',
+    ghostLag: '圆盘留影延迟',
+    ghostBlur: '圆盘留影虚化',
+    visualizer: '能量柱长度',
+    visualizerRange: '能量柱范围',
+    visualizerContrast: '能量柱比例',
+    visualizerDecay: '能量柱缓降',
+    waveSize: '冲击波大小',
+    waveIntensity: '冲击波强度',
+    fountain: '星星喷泉',
+    starGlow: '星星光晕',
+    fountainSensitivity: '喷泉灵敏度',
+    resetSettings: '重置所有参数',
+    foundOsu: '找到 osu! Songs：{path}',
+    noOsu: '没有自动找到 osu! Songs。可以手动粘贴路径。',
+    missingPath: '请先填写文件夹路径。',
+    scanningOsu: '正在扫描 osu! 谱面...',
+    scanningMusic: '正在扫描普通音乐...',
+    loadedTracks: '已载入 {count} 首歌曲，合并了 {duplicates} 个重复难度/重复音频。',
+    noPlayable: '没有找到可播放音乐。',
+    requestFailed: '请求失败',
+    beatSync: '节拍同步',
+    audioSync: '音频同步',
+    loadedTiming: '已读取 {count} 个 timing points。',
+    loadedAudio: '已载入，使用音频分析。',
+    playingTiming: '播放中，已同步 {count} 个 timing points。',
+    playingAudio: '播放中，使用音频分析。',
+    unlockAudio: '请点击播放以解锁音频分析。',
+    audioBlocked: '音频播放被浏览器拦截，请再点一次播放。',
+  },
+  en: {
+    appTitle: 'osu! Visual Shell',
+    appAria: 'visual player',
+    topBarAria: 'playback status bar',
+    quickActions: 'quick actions',
+    openControls: 'open music controls',
+    musicControls: 'Music Controls',
+    clickOpen: 'click to open',
+    ready: 'ready',
+    loading: 'loaded',
+    playing: 'playing',
+    paused: 'paused',
+    waiting: 'waiting',
+    noTrack: 'No track selected',
+    scanPrompt: 'Scan a local library first',
+    minimize: 'Minimize',
+    previous: 'Previous',
+    play: 'Play',
+    pause: 'Pause',
+    next: 'Next',
+    scan: 'Scan',
+    library: 'Library',
+    settings: 'Settings',
+    progress: 'Track progress',
+    readyStatus: 'Ready. You can detect local osu! Songs.',
+    scanFolder: 'scan folder',
+    librarySource: 'Library Source',
+    close: 'Close',
+    folderPath: 'Folder path',
+    folderPlaceholder: 'C:\\Users\\You\\AppData\\Local\\osu!\\Songs',
+    detectOsu: 'Detect osu!',
+    scanOsu: 'Scan osu! Songs',
+    scanMusic: 'Scan music folder',
+    chooseSong: 'choose track',
+    songs: 'Songs',
+    songCount: '{count} songs',
+    scanning: 'Scanning',
+    filterSongs: 'Filter songs',
+    songList: 'song list',
+    visualSettings: 'Visual Settings',
+    language: 'Language',
+    languageAuto: 'Auto',
+    sideIntensity: 'Side light intensity',
+    sideRestraint: 'Side light restraint',
+    pulse: 'Core pulse',
+    coreGlow: 'Core glow intensity',
+    coreGlowColor: 'Core glow color',
+    ghostIntensity: 'Core ghost intensity',
+    ghostSize: 'Core ghost size',
+    ghostLag: 'Core ghost delay',
+    ghostBlur: 'Core ghost blur',
+    visualizer: 'Visualizer length',
+    visualizerRange: 'Visualizer range',
+    visualizerContrast: 'Visualizer contrast',
+    visualizerDecay: 'Visualizer decay',
+    waveSize: 'Wave size',
+    waveIntensity: 'Wave intensity',
+    fountain: 'Star fountain',
+    starGlow: 'Star glow',
+    fountainSensitivity: 'Fountain sensitivity',
+    resetSettings: 'Reset all parameters',
+    foundOsu: 'Found osu! Songs: {path}',
+    noOsu: 'No osu! Songs folder was detected. You can paste a path manually.',
+    missingPath: 'Please enter a folder path first.',
+    scanningOsu: 'Scanning osu! beatmaps...',
+    scanningMusic: 'Scanning local music...',
+    loadedTracks: 'Loaded {count} songs and merged {duplicates} duplicate difficulties/audio files.',
+    noPlayable: 'No playable music was found.',
+    requestFailed: 'Request failed',
+    beatSync: 'beat sync',
+    audioSync: 'audio sync',
+    loadedTiming: 'Loaded {count} timing points.',
+    loadedAudio: 'Loaded. Using audio analysis.',
+    playingTiming: 'Playing with {count} timing points synced.',
+    playingAudio: 'Playing with audio analysis.',
+    unlockAudio: 'Click play to unlock audio analysis.',
+    audioBlocked: 'Audio playback was blocked by the browser. Click play again.',
+  },
+};
 
 const idleAfterMs = 6000;
 const sideFlashEarlyMs = 65;
@@ -219,6 +384,77 @@ function setText(node, value) {
   node.textContent = value;
 }
 
+function browserLanguage() {
+  const language = `${navigator.language || navigator.userLanguage || ''}`.toLowerCase();
+  return language.startsWith('zh') ? 'zh' : 'en';
+}
+
+function normaliseLanguageChoice(value) {
+  return value === 'zh' || value === 'en' || value === 'auto' ? value : 'auto';
+}
+
+function resolveLanguage() {
+  const choice = normaliseLanguageChoice(settings.language);
+  return choice === 'auto' ? browserLanguage() : choice;
+}
+
+function text(key, values = {}) {
+  const template = i18n[activeLanguage]?.[key] || i18n.en[key] || key;
+  return template.replace(/\{(\w+)}/g, (_, name) => values[name] ?? '');
+}
+
+function setStatusKey(key, values = {}) {
+  statusState = { key, values };
+  setStatus(text(key, values));
+}
+
+function syncTransportLabels() {
+  const key = audio.paused ? 'play' : 'pause';
+  const label = text(key);
+  setText(playButton, label);
+  setText(topPlayButton, label);
+  playButton?.setAttribute('aria-label', label);
+  topPlayButton?.setAttribute('aria-label', label);
+}
+
+function syncTrackText() {
+  const track = tracks[activeIndex];
+  if (track) {
+    setText(trackTitle, track.title);
+    setText(topTitle, track.title);
+    const meta = `${track.artist}${track.version ? ` / ${track.version}` : ''}`;
+    setText(trackMeta, meta);
+    setText(topMeta, meta);
+    return;
+  }
+  setText(trackTitle, text('noTrack'));
+  setText(topTitle, text('noTrack'));
+  setText(trackMeta, text('scanPrompt'));
+  setText(topMeta, text('scanPrompt'));
+}
+
+function applyLanguage() {
+  activeLanguage = resolveLanguage();
+  document.documentElement.lang = activeLanguage === 'zh' ? 'zh-CN' : 'en';
+  document.title = text('appTitle');
+  document.querySelectorAll('[data-i18n]').forEach((node) => setText(node, text(node.dataset.i18n)));
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((node) => {
+    node.setAttribute('placeholder', text(node.dataset.i18nPlaceholder));
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach((node) => {
+    node.setAttribute('aria-label', text(node.dataset.i18nAria));
+  });
+  if (languageSelect) languageSelect.value = normaliseLanguageChoice(settings.language);
+  syncTransportLabels();
+  syncTrackText();
+  setStatus(text(statusState.key, statusState.values));
+  if (activeIndex === -1) {
+    setText(coreSubtitle, text('clickOpen'));
+    setText(miniState, text('ready'));
+  }
+  renderList();
+}
+
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(settingsKey) || '{}');
@@ -226,6 +462,7 @@ function loadSettings() {
   } catch {
     // Keep defaults when local storage contains invalid data.
   }
+  settings.language = normaliseLanguageChoice(settings.language);
 
   for (const [key, input] of Object.entries(settingsInputs)) {
     if (!input) continue;
@@ -246,13 +483,23 @@ function loadSettings() {
     input.addEventListener('input', () => persistColourSetting(key, input.value));
   }
 
+  languageSelect?.addEventListener('change', () => {
+    settings.language = normaliseLanguageChoice(languageSelect.value);
+    localStorage.setItem(settingsKey, JSON.stringify(settings));
+    applyLanguage();
+    touch('settings');
+  });
+
   resetSettingsButton?.addEventListener('click', () => {
     Object.assign(settings, defaultSettings);
     localStorage.setItem(settingsKey, JSON.stringify(settings));
     Object.keys(settingsInputs).forEach(writeSettingInputs);
     Object.keys(settingsColorInputs).forEach(writeColourInput);
+    applyLanguage();
     touch('settings');
   });
+
+  applyLanguage();
 }
 
 function markUiAction() {
@@ -267,7 +514,7 @@ function setIdlePanel() {
 }
 
 function isInterfaceTarget(target) {
-  return Boolean(target?.closest?.('.core, .control-panel, .float-panel, button, input, label, .track, [role="button"]'));
+  return Boolean(target?.closest?.('.core, .top-bar, .control-panel, .float-panel, button, input, select, label, .track, [role="button"]'));
 }
 
 function handleBlankDismiss(event) {
@@ -335,7 +582,7 @@ function setupAudioGraph() {
 async function fetchJson(url) {
   const res = await fetch(url);
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || '请求失败');
+  if (!res.ok) throw new Error(data.error || text('requestFailed'));
   return data;
 }
 
@@ -343,25 +590,25 @@ async function detectOsu() {
   const data = await fetchJson('/api/default-paths');
   if (data.osuSongs?.length) {
     folderPath.value = data.osuSongs[0];
-    setStatus(`找到 osu! Songs：${data.osuSongs[0]}`);
+    setStatusKey('foundOsu', { path: data.osuSongs[0] });
   } else {
-    setStatus('没有自动找到 osu! Songs。可以手动粘贴路径。');
+    setStatusKey('noOsu');
   }
 }
 
 async function scan(kind) {
   const path = folderPath.value.trim();
   if (!path) {
-    setStatus('请先填写文件夹路径。');
+    setStatusKey('missingPath');
     return;
   }
 
   setPanel('scan');
-  setStatus(kind === 'osu' ? '正在扫描 osu! 谱面...' : '正在扫描普通音乐...');
+  setStatusKey(kind === 'osu' ? 'scanningOsu' : 'scanningMusic');
   tracks = [];
   visibleTracks = [];
   listEl.innerHTML = '';
-  songCount.textContent = '扫描中';
+  setText(songCount, text('scanning'));
 
   try {
     const data = await fetchJson(`/api/scan?kind=${kind}&path=${encodeURIComponent(path)}`);
@@ -370,9 +617,11 @@ async function scan(kind) {
     visibleTracks = tracks;
     renderList();
     const duplicateCount = Math.max(0, rawTracks.length - tracks.length);
-    setStatus(tracks.length
-      ? `已载入 ${tracks.length} 首歌曲，合并了 ${duplicateCount} 个重复难度/重复音频。`
-      : '没有找到可播放音乐。');
+    if (tracks.length) {
+      setStatusKey('loadedTracks', { count: tracks.length, duplicates: duplicateCount });
+    } else {
+      setStatusKey('noPlayable');
+    }
     setPanel('songs');
   } catch (error) {
     setStatus(error.message);
@@ -403,7 +652,7 @@ function renderList() {
     ? tracks.filter((track) => `${track.title} ${track.artist} ${track.version}`.toLowerCase().includes(query))
     : tracks;
 
-  songCount.textContent = `${visibleTracks.length} 首`;
+  setText(songCount, text('songCount', { count: visibleTracks.length }));
   listEl.innerHTML = '';
   const fragment = document.createDocumentFragment();
 
@@ -446,10 +695,9 @@ async function playIndex(index) {
   background.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   cover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   coreCover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
-  trackTitle.textContent = track.title;
-  trackMeta.textContent = `${track.artist}${track.version ? ` / ${track.version}` : ''}`;
-  coreSubtitle.textContent = track.timingPoints?.length ? '节拍同步' : '音频同步';
-  miniState.textContent = '已载入';
+  syncTrackText();
+  setText(coreSubtitle, track.timingPoints?.length ? text('beatSync') : text('audioSync'));
+  setText(miniState, text('loading'));
   activeTimingPoint = pickTimingPoint(track, 0);
   activeEffectPoint = pickEffectPoint(track, 0);
   currentBeatLengthMs = activeTimingPoint?.beatLength || 620;
@@ -489,29 +737,38 @@ async function playIndex(index) {
   visualizerBars.fill(0);
   previousVisualizerBins.fill(0);
   markActiveTrack();
-  setStatus(track.timingPoints?.length ? `已读取 ${track.timingPoints.length} 个 timing points。` : '已载入，使用音频分析。');
+  if (track.timingPoints?.length) {
+    setStatusKey('loadedTiming', { count: track.timingPoints.length });
+  } else {
+    setStatusKey('loadedAudio');
+  }
 
   try {
     setupAudioGraph();
     await audioContext.resume().catch(() => {});
-    playButton.textContent = '暂停';
+    syncTransportLabels();
     const playPromise = audio.play();
     if (playPromise) {
       playPromise
         .then(() => {
-          miniState.textContent = '播放中';
-          setStatus(track.timingPoints?.length ? `播放中，已同步 ${track.timingPoints.length} 个 timing points。` : '播放中，使用音频分析。');
+          setText(miniState, text('playing'));
+          syncTransportLabels();
+          if (track.timingPoints?.length) {
+            setStatusKey('playingTiming', { count: track.timingPoints.length });
+          } else {
+            setStatusKey('playingAudio');
+          }
         })
         .catch(() => {
-          playButton.textContent = '播放';
-          miniState.textContent = '待播放';
-          setStatus('请点击播放以解锁音频分析。');
+          syncTransportLabels();
+          setText(miniState, text('waiting'));
+          setStatusKey('unlockAudio');
         });
     }
   } catch {
-    playButton.textContent = '播放';
-    miniState.textContent = '待播放';
-    setStatus('请点击播放以解锁音频分析。');
+    syncTransportLabels();
+    setText(miniState, text('waiting'));
+    setStatusKey('unlockAudio');
   }
 }
 
@@ -550,22 +807,22 @@ async function togglePlay() {
     if (audio.paused) {
       try {
         await audio.play();
-        playButton.textContent = '暂停';
-        miniState.textContent = '播放中';
+        syncTransportLabels();
+        setText(miniState, text('playing'));
       } catch {
-        playButton.textContent = '播放';
-        miniState.textContent = '待播放';
-        setStatus('音频播放被浏览器拦截，请再点一次播放。');
+        syncTransportLabels();
+        setText(miniState, text('waiting'));
+        setStatusKey('audioBlocked');
       }
     } else {
       audio.pause();
-      playButton.textContent = '播放';
-      miniState.textContent = '已暂停';
+      syncTransportLabels();
+      setText(miniState, text('paused'));
     }
   } catch {
-    playButton.textContent = '播放';
-    miniState.textContent = '待播放';
-    setStatus('音频播放被浏览器拦截，请再点一次播放。');
+    syncTransportLabels();
+    setText(miniState, text('waiting'));
+    setStatusKey('audioBlocked');
   }
 }
 
@@ -588,17 +845,17 @@ function runTransport(event, action) {
 
 function runTransportButton(event, button) {
   if (!button) return;
-  if (button.id === 'toggle-play') runTransport(event, togglePlay);
-  if (button.id === 'prev') runTransport(event, () => stepTrack(-1));
-  if (button.id === 'next') runTransport(event, () => stepTrack(1));
+  if (button.id === 'toggle-play' || button.id === 'top-play') runTransport(event, togglePlay);
+  if (button.id === 'prev' || button.id === 'top-prev') runTransport(event, () => stepTrack(-1));
+  if (button.id === 'next' || button.id === 'top-next') runTransport(event, () => stepTrack(1));
 }
 
 function findTransportButton(event) {
   const path = event.composedPath?.() || [];
-  const fromPath = path.find((item) => item?.id === 'toggle-play' || item?.id === 'prev' || item?.id === 'next');
+  const fromPath = path.find((item) => ['toggle-play', 'prev', 'next', 'top-play', 'top-prev', 'top-next'].includes(item?.id));
   if (fromPath) return fromPath;
   const fromPoint = document.elementFromPoint(event.clientX, event.clientY);
-  return fromPoint?.closest?.('#toggle-play, #prev, #next') || null;
+  return fromPoint?.closest?.('#toggle-play, #prev, #next, #top-play, #top-prev, #top-next') || null;
 }
 
 function updateTiming() {
@@ -1368,7 +1625,7 @@ window.addEventListener('pointerdown', (event) => {
 }, { capture: true });
 window.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
-  const button = document.activeElement?.closest?.('#toggle-play, #prev, #next');
+  const button = document.activeElement?.closest?.('#toggle-play, #prev, #next, #top-play, #top-prev, #top-next');
   if (!button) return;
   runTransportButton(event, button);
 });
@@ -1383,6 +1640,9 @@ settingsPanel.addEventListener('pointerdown', () => touch('settings'));
 document.querySelector('#open-scan').addEventListener('click', () => setPanel('scan'));
 document.querySelector('#open-library').addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
 document.querySelector('#open-settings').addEventListener('click', () => setPanel('settings'));
+document.querySelector('#top-scan').addEventListener('click', () => setPanel('scan'));
+document.querySelector('#top-library').addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
+document.querySelector('#top-settings').addEventListener('click', () => setPanel('settings'));
 minimizeControls.addEventListener('click', () => setPanel('idle'));
 document.querySelector('#close-scan').addEventListener('click', () => setPanel('controls'));
 document.querySelector('#close-library').addEventListener('click', () => setPanel('controls'));
@@ -1393,6 +1653,9 @@ document.querySelector('#scan-music').addEventListener('click', () => scan('musi
 document.querySelector('#prev').addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
 playButton.addEventListener('click', (event) => runTransport(event, togglePlay));
 document.querySelector('#next').addEventListener('click', (event) => runTransport(event, () => stepTrack(1)));
+document.querySelector('#top-prev').addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
+topPlayButton.addEventListener('click', (event) => runTransport(event, togglePlay));
+document.querySelector('#top-next').addEventListener('click', (event) => runTransport(event, () => stepTrack(1)));
 search.addEventListener('input', renderList);
 
 progress.addEventListener('pointerdown', () => {
@@ -1415,12 +1678,12 @@ progress.addEventListener('pointerup', () => {
 
 audio.addEventListener('ended', () => stepTrack(1));
 audio.addEventListener('play', () => {
-  playButton.textContent = '暂停';
-  miniState.textContent = '播放中';
+  syncTransportLabels();
+  setText(miniState, text('playing'));
 });
 audio.addEventListener('pause', () => {
-  playButton.textContent = '播放';
-  miniState.textContent = activeIndex === -1 ? '就绪' : '已暂停';
+  syncTransportLabels();
+  setText(miniState, activeIndex === -1 ? text('ready') : text('paused'));
 });
 
 loadSettings();
