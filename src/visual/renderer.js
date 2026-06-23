@@ -608,8 +608,38 @@ async function detectOsu() {
   }
 }
 
+function samePath(left, right) {
+  return normaliseKey(left) === normaliseKey(right);
+}
+
+function isStableSongsPath(path, detectedPaths) {
+  return detectedPaths.osuSongs?.some((item) => samePath(path, item)) || /[/\\]osu![/\\]songs$/i.test(path);
+}
+
+function isLazerRootPath(path, detectedPaths) {
+  return detectedPaths.lazerRoots?.some((item) => samePath(path, item));
+}
+
+async function resolveScanPath(kind) {
+  let path = folderPath.value.trim();
+  if (kind !== 'osu' && kind !== 'lazer') return path;
+
+  const detectedPaths = await fetchJson('/api/default-paths');
+  if (kind === 'lazer' && detectedPaths.lazerRoots?.length && (!path || isStableSongsPath(path, detectedPaths))) {
+    path = detectedPaths.lazerRoots[0];
+    folderPath.value = path;
+    setStatusKey('foundLazer', { path });
+  }
+  if (kind === 'osu' && detectedPaths.osuSongs?.length && (!path || isLazerRootPath(path, detectedPaths))) {
+    path = detectedPaths.osuSongs[0];
+    folderPath.value = path;
+    setStatusKey('foundOsu', { path });
+  }
+  return path;
+}
+
 async function scan(kind) {
-  const path = folderPath.value.trim();
+  const path = await resolveScanPath(kind);
   if (!path) {
     setStatusKey('missingPath');
     return;
