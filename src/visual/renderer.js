@@ -1320,28 +1320,46 @@ function updateLogoAmplitudes(now, elapsed) {
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
   }
 
-  if (!freqData || audio.paused || now - lastVisualizerUpdate < 50) return;
+  if (!freqData || audio.paused || now - lastVisualizerUpdate < 32) return;
   lastVisualizerUpdate = now;
 
   const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
-  const dynamicRange = 0.18 + Math.max(0.04, amplitudeAverage) * 0.72;
-  const userScale = 0.56 + Math.max(0, settings.visualizer) * 0.44;
-  const noiseFloor = Math.max(0.012, amplitudeAverage * 0.14);
-  const contrast = Math.max(0.35, settings.visualizerContrast || 1.6);
+  const dynamicRange = 0.08 + Math.max(0.04, amplitudeAverage) * 1.05;
+  const userScale = 0.66 + Math.max(0, settings.visualizer) * 0.34;
+  const noiseFloor = Math.max(0.034, amplitudeAverage * 0.28);
+  const contrast = Math.max(0.1, settings.visualizerContrast || 1.6);
   const startupLimiter = Math.min(1, Math.max(0.18, (audio.currentTime || 0) / 2.8));
+  const attackLimit = (0.028 + Math.min(0.09, audioAmplitude * 0.11)) * (activeEffectPoint?.kiai ? 1.25 : 1);
+  const candidates = [];
 
   for (let i = 0; i < visualizerBars.length; i += 1) {
     const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
     const raw = (freqData[sourceIndex] || 0) / 255;
-    const prevBin = previousVisualizerBins[i];
-    const freshLift = Math.max(0, raw - prevBin);
+    const prev = (freqData[(sourceIndex + freqData.length - 2) % freqData.length] || 0) / 255;
+    const next = (freqData[(sourceIndex + 2) % freqData.length] || 0) / 255;
+    const localAverage = (prev + next) * 0.5;
+    const localPeak = raw > prev * 1.04 && raw >= next * 0.98;
+    const freshLift = Math.max(0, raw - previousVisualizerBins[i]);
+    const peak = Math.max(0, raw - localAverage * 0.72 - noiseFloor + freshLift * 0.42);
     previousVisualizerBins[i] = raw;
-    const lifted = Math.max(0, raw - noiseFloor) + freshLift * 0.28;
-    if (lifted <= 0) continue;
-    const normalised = Math.min(1, lifted / dynamicRange);
-    const shaped = Math.pow(normalised, 0.82 + contrast * 0.11);
-    const target = Math.min(0.92, shaped * kiaiMultiplier * userScale * startupLimiter);
-    if (target > visualizerBars[i]) visualizerBars[i] = target;
+    if (!localPeak || peak <= 0) continue;
+    const normalised = peak / dynamicRange;
+    const compressed = Math.min(1, normalised);
+    const shaped = Math.pow(compressed, contrast);
+    const target = Math.min(0.82, shaped * (0.42 + contrast * 0.12) * kiaiMultiplier * userScale * startupLimiter);
+    if (target > visualizerBars[i]) candidates.push({ index: i, target, score: target + freshLift * 0.5 });
+  }
+
+  candidates
+    .sort((a, b) => b.score - a.score)
+    .slice(0, activeEffectPoint?.kiai ? 34 : 24)
+    .forEach(({ index, target }) => {
+      visualizerBars[index] = Math.min(target, visualizerBars[index] + attackLimit);
+    });
+
+  for (let i = 1; i < visualizerBars.length - 1; i += 1) {
+    const neighbourCap = Math.max(visualizerBars[i - 1], visualizerBars[i + 1]) * 0.92;
+    if (visualizerBars[i] > neighbourCap && visualizerBars[i] < 0.08) visualizerBars[i] *= 0.86;
   }
 
   visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
