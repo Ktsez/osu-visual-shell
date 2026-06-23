@@ -276,6 +276,65 @@ function nearestAudio(osuItem, audioItems, parsed) {
   return veryNear?.item || null;
 }
 
+function findBufferOffsets(buffer, needle, limit = 16) {
+  const offsets = [];
+  if (!needle?.length) return offsets;
+  let index = buffer.indexOf(needle);
+  while (index !== -1 && offsets.length < limit) {
+    offsets.push(index);
+    index = buffer.indexOf(needle, index + 1);
+  }
+  return offsets;
+}
+
+function filenameNeedles(filename) {
+  const clean = String(filename || '').replaceAll('\\', '/').trim();
+  const names = [...new Set([clean, basename(clean)].filter(Boolean))];
+  return names.map((name) => Buffer.from(name, 'utf8'));
+}
+
+function linkedRealmFile(realmBuffer, osuHash, filename, itemByHash, expectedKind) {
+  if (!realmBuffer || !osuHash || !filename) return null;
+  const osuOffsets = findBufferOffsets(realmBuffer, Buffer.from(osuHash, 'utf8'), 24);
+  if (!osuOffsets.length) return null;
+
+  let best = null;
+  const needles = filenameNeedles(filename);
+
+  for (const osuOffset of osuOffsets) {
+    const windowStart = Math.max(0, osuOffset - 26000);
+    const windowEnd = Math.min(realmBuffer.length, osuOffset + 26000);
+    const window = realmBuffer.subarray(windowStart, windowEnd);
+
+    for (const needle of needles) {
+      let localNameOffset = window.indexOf(needle);
+      while (localNameOffset !== -1) {
+        const nameOffset = windowStart + localNameOffset;
+        const hashStart = Math.max(0, nameOffset - 2600);
+        const hashEnd = Math.min(realmBuffer.length, nameOffset + 4200);
+        const chunk = realmBuffer.subarray(hashStart, hashEnd).toString('latin1');
+        const hashMatches = chunk.matchAll(/[a-f0-9]{64}/gi);
+
+        for (const match of hashMatches) {
+          const hash = match[0].toLowerCase();
+          const item = itemByHash.get(hash);
+          if (!item || item.kind !== expectedKind) continue;
+
+          const hashOffset = hashStart + match.index;
+          const filenameDistance = Math.abs(hashOffset - nameOffset);
+          const beatmapDistance = Math.abs(hashOffset - osuOffset);
+          const score = filenameDistance + beatmapDistance * 0.18 + (hashOffset < nameOffset ? 180 : 0);
+          if (!best || score < best.score) best = { item, score };
+        }
+
+        localNameOffset = window.indexOf(needle, localNameOffset + 1);
+      }
+    }
+  }
+
+  return best?.item || null;
+}
+
 function nearestBackground(osuItem, imageItems, parsed) {
   const hasDeclaredBackground = Boolean(parsed?.background);
   const tightWindow = hasDeclaredBackground ? 1200 : 900;
@@ -308,15 +367,17 @@ async function scanLazerLibrary(lazerPath) {
   const osuItems = items.filter((item) => item.kind === 'osu');
   const audioItems = items.filter((item) => item.kind === 'audio');
   const imageItems = items.filter((item) => item.kind === 'image');
+  const itemByHash = new Map(items.map((item) => [item.hash, item]));
+  const realmBuffer = await readFile(join(lazerRoot, 'client.realm')).catch(() => null);
   const entries = [];
 
   for (const item of osuItems) {
     if (entries.length >= 1500) break;
     try {
       const parsed = parseOsuFile(item.text, '');
-      const audio = nearestAudio(item, audioItems, parsed);
+      const audio = linkedRealmFile(realmBuffer, item.hash, parsed.audio, itemByHash, 'audio') || nearestAudio(item, audioItems, parsed);
       if (!audio) continue;
-      const background = nearestBackground(item, imageItems, parsed);
+      const background = linkedRealmFile(realmBuffer, item.hash, parsed.background, itemByHash, 'image') || nearestBackground(item, imageItems, parsed);
       entries.push({
         id: createHash('sha1').update(item.hash).digest('hex').slice(0, 12),
         source: 'lazer',

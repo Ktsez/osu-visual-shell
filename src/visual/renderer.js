@@ -1200,51 +1200,29 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
   if (!hasDrumLikeEnergy && !kiaiTagged) return;
 
   if (kiaiTagged) {
-    if (strongMoment) {
-      const bothAmount = Math.max(osuSideAlpha(leftEnergy, true), osuSideAlpha(rightEnergy, true)) * 0.76;
-      if (flashSide('both', bothAmount, 'hard', 'kiai-downbeat-both', beatIndex, timeSinceBeat)) {
-        sideMode = 'both';
-        sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * Math.max(2, meter) * 1.18);
-      }
-      return;
-    }
-
-    if (sideMode === 'both' && performance.now() < sideModeUntil) return;
-
-    const layer = strongMoment ? 'hard' : 'soft';
+    const layer = strongMoment || downbeat ? 'hard' : 'soft';
     if (beatIndex % 2 === 0) {
-      const amount = osuSideAlpha(leftEnergy, true) * (layer === 'hard' ? 1 : 0.68);
+      const amount = osuSideAlpha(leftEnergy, true) * (layer === 'hard' ? 1 : 0.74);
       flashSide('left', amount, layer, `kiai-${layer}-left`, beatIndex, timeSinceBeat);
     } else {
-      const amount = osuSideAlpha(rightEnergy, true) * (layer === 'hard' ? 1 : 0.68);
+      const amount = osuSideAlpha(rightEnergy, true) * (layer === 'hard' ? 1 : 0.74);
       flashSide('right', amount, layer, `kiai-${layer}-right`, beatIndex, timeSinceBeat);
     }
 
     return;
   }
 
-  if (!downbeat && !(strongRise && activity > 0.31 + settings.sideRestraint * 0.08)) return;
+  if (!downbeat) return;
 
   const enoughPresence = (activity > 0.28 + settings.sideRestraint * 0.18 && hasDrumLikeEnergy) || (strongRise && percussivePresence > 0.18);
   if (!enoughPresence) return;
 
-  const layer = strongMoment ? 'hard' : 'soft';
-  const side = beatIndex % 2 === 0 ? 'left' : 'right';
   const leftAmount = osuSideAlpha(leftEnergy, false);
   const rightAmount = osuSideAlpha(rightEnergy, false);
-  const amount = side === 'left' ? leftAmount : rightAmount;
-
-  if (layer === 'hard') {
-    if (flashSide('both', Math.max(leftAmount, rightAmount) * 0.88, 'hard', 'normal-downbeat-both', beatIndex, timeSinceBeat)) {
-      sideMode = 'both';
-      sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * Math.max(2, meter) * 1.08);
-    }
-  } else {
-    if (sideMode === 'both' && performance.now() < sideModeUntil) return;
-    if (flashSide(side, amount * 0.7, 'soft', `normal-soft-${side}`, beatIndex, timeSinceBeat)) {
-      sideMode = 'alternate';
-      sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * 2.6);
-    }
+  const layer = strongMoment ? 'hard' : 'soft';
+  if (flashSide('both', Math.max(leftAmount, rightAmount) * (layer === 'hard' ? 0.88 : 0.66), layer, `normal-downbeat-both-${layer}`, beatIndex, timeSinceBeat)) {
+    sideMode = 'both';
+    sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * Math.max(1.25, meter * 0.62));
   }
 }
 
@@ -1342,47 +1320,30 @@ function updateLogoAmplitudes(now, elapsed) {
     if (visualizerBars[i] < 0) visualizerBars[i] = 0;
   }
 
-  if (!freqData || audio.paused || now - lastVisualizerUpdate < 32) return;
+  if (!freqData || audio.paused || now - lastVisualizerUpdate < 50) return;
   lastVisualizerUpdate = now;
 
   const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
-  const dynamicRange = 0.08 + Math.max(0.04, amplitudeAverage) * 1.05;
-  const userScale = 0.66 + Math.max(0, settings.visualizer) * 0.34;
-  const noiseFloor = Math.max(0.034, amplitudeAverage * 0.28);
-  const contrast = Math.max(0.1, settings.visualizerContrast || 1.6);
+  const dynamicRange = 0.18 + Math.max(0.04, amplitudeAverage) * 0.72;
+  const userScale = 0.56 + Math.max(0, settings.visualizer) * 0.44;
+  const noiseFloor = Math.max(0.012, amplitudeAverage * 0.14);
+  const contrast = Math.max(0.35, settings.visualizerContrast || 1.6);
   const startupLimiter = Math.min(1, Math.max(0.18, (audio.currentTime || 0) / 2.8));
-  const attackLimit = (0.028 + Math.min(0.09, audioAmplitude * 0.11)) * (activeEffectPoint?.kiai ? 1.25 : 1);
-  const candidates = [];
 
   for (let i = 0; i < visualizerBars.length; i += 1) {
     const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
     const raw = (freqData[sourceIndex] || 0) / 255;
-    const prev = (freqData[(sourceIndex + freqData.length - 2) % freqData.length] || 0) / 255;
-    const next = (freqData[(sourceIndex + 2) % freqData.length] || 0) / 255;
-    const localAverage = (prev + next) * 0.5;
-    const localPeak = raw > prev * 1.04 && raw >= next * 0.98;
-    const freshLift = Math.max(0, raw - previousVisualizerBins[i]);
-    const peak = Math.max(0, raw - localAverage * 0.72 - noiseFloor + freshLift * 0.42);
+    const prevBin = previousVisualizerBins[i];
+    const freshLift = Math.max(0, raw - prevBin);
     previousVisualizerBins[i] = raw;
-    if (!localPeak || peak <= 0) continue;
-    const normalised = peak / dynamicRange;
-    const compressed = Math.min(1, normalised);
-    const shaped = Math.pow(compressed, contrast);
-    const target = Math.min(0.82, shaped * (0.42 + contrast * 0.12) * kiaiMultiplier * userScale * startupLimiter);
-    if (target > visualizerBars[i]) candidates.push({ index: i, target, score: target + freshLift * 0.5 });
+    const lifted = Math.max(0, raw - noiseFloor) + freshLift * 0.28;
+    if (lifted <= 0) continue;
+    const normalised = Math.min(1, lifted / dynamicRange);
+    const shaped = Math.pow(normalised, 0.82 + contrast * 0.11);
+    const target = Math.min(0.92, shaped * kiaiMultiplier * userScale * startupLimiter);
+    if (target > visualizerBars[i]) visualizerBars[i] = target;
   }
 
-  candidates
-    .sort((a, b) => b.score - a.score)
-    .slice(0, activeEffectPoint?.kiai ? 34 : 24)
-    .forEach(({ index, target }) => {
-      visualizerBars[index] = Math.min(target, visualizerBars[index] + attackLimit);
-    });
-
-  for (let i = 1; i < visualizerBars.length - 1; i += 1) {
-    const neighbourCap = Math.max(visualizerBars[i - 1], visualizerBars[i + 1]) * 0.92;
-    if (visualizerBars[i] > neighbourCap && visualizerBars[i] < 0.08) visualizerBars[i] *= 0.86;
-  }
   visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
 }
 
