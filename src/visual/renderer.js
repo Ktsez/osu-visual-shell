@@ -541,8 +541,8 @@ function handleBlankDismiss(event) {
 
 function readStageSize() {
   const rect = canvas.getBoundingClientRect();
-  const width = rect.width || document.documentElement.clientWidth || window.visualViewport?.width || window.innerWidth;
-  const height = rect.height || document.documentElement.clientHeight || window.visualViewport?.height || window.innerHeight;
+  const width = window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || rect.width;
+  const height = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || rect.height;
   return {
     width: Math.max(1, width),
     height: Math.max(1, height),
@@ -576,6 +576,17 @@ function coreVisualMetrics(stageWidth, stageHeight) {
 
 function resize() {
   syncCanvasSize();
+}
+
+function scheduleLayoutSync() {
+  lastLayoutSignature = '';
+  resize();
+  for (const delay of [80, 180, 360, 720]) {
+    window.setTimeout(() => {
+      lastLayoutSignature = '';
+      resize();
+    }, delay);
+  }
 }
 
 function setupAudioGraph() {
@@ -1146,9 +1157,9 @@ function flashSide(side, amount, layer = 'soft', reason = 'beat', beatIndex = la
   const startedAt = now - Math.max(0, timeSinceBeat);
   const hard = layer === 'hard';
   const mode = side === 'both' ? 'both' : 'alternate';
-  if (sideMode !== 'idle' && sideMode !== mode && now < sideModeUntil) return;
+  if (sideMode !== 'idle' && sideMode !== mode && now < sideModeUntil) return false;
   sideMode = mode;
-  sideModeUntil = now + Math.max(260, (currentBeatLengthMs || 620) * (hard ? 0.92 : 0.74));
+  sideModeUntil = Math.max(sideModeUntil, now + Math.max(320, (currentBeatLengthMs || 620) * (hard ? 1.8 : 1.45)));
   const makeEnvelope = (existing) => ({
     start: startedAt,
     peak: Math.max(clamped, envelopeValue(existing, now) * 0.9),
@@ -1175,6 +1186,7 @@ function flashSide(side, amount, layer = 'soft', reason = 'beat', beatIndex = la
     kiai: Boolean(activeEffectPoint?.kiai),
   });
   scytheEvents = scytheEvents.slice(-36);
+  return true;
 }
 
 function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0) {
@@ -1190,9 +1202,14 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
   if (kiaiTagged) {
     if (strongMoment) {
       const bothAmount = Math.max(osuSideAlpha(leftEnergy, true), osuSideAlpha(rightEnergy, true)) * 0.76;
-      flashSide('both', bothAmount, 'hard', 'kiai-downbeat-both', beatIndex, timeSinceBeat);
+      if (flashSide('both', bothAmount, 'hard', 'kiai-downbeat-both', beatIndex, timeSinceBeat)) {
+        sideMode = 'both';
+        sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * Math.max(2, meter) * 1.18);
+      }
       return;
     }
+
+    if (sideMode === 'both' && performance.now() < sideModeUntil) return;
 
     const layer = strongMoment ? 'hard' : 'soft';
     if (beatIndex % 2 === 0) {
@@ -1218,9 +1235,16 @@ function handleOsuSideFlashBeat(beatIndex, meter, kiaiTagged, timeSinceBeat = 0)
   const amount = side === 'left' ? leftAmount : rightAmount;
 
   if (layer === 'hard') {
-    flashSide('both', Math.max(leftAmount, rightAmount) * 0.88, 'hard', 'normal-downbeat-both', beatIndex, timeSinceBeat);
+    if (flashSide('both', Math.max(leftAmount, rightAmount) * 0.88, 'hard', 'normal-downbeat-both', beatIndex, timeSinceBeat)) {
+      sideMode = 'both';
+      sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * Math.max(2, meter) * 1.08);
+    }
   } else {
-    flashSide(side, amount * 0.7, 'soft', `normal-soft-${side}`, beatIndex, timeSinceBeat);
+    if (sideMode === 'both' && performance.now() < sideModeUntil) return;
+    if (flashSide(side, amount * 0.7, 'soft', `normal-soft-${side}`, beatIndex, timeSinceBeat)) {
+      sideMode = 'alternate';
+      sideModeUntil = Math.max(sideModeUntil, performance.now() + (currentBeatLengthMs || 620) * 2.6);
+    }
   }
 }
 
@@ -1805,9 +1829,12 @@ function drawLogoVisualizer(cx, cy, coreSize) {
   ctx.restore();
 }
 
-window.addEventListener('resize', resize);
-window.visualViewport?.addEventListener('resize', resize);
-window.visualViewport?.addEventListener('scroll', resize);
+window.addEventListener('resize', scheduleLayoutSync);
+window.addEventListener('fullscreenchange', scheduleLayoutSync);
+window.addEventListener('orientationchange', scheduleLayoutSync);
+window.addEventListener('pageshow', scheduleLayoutSync);
+window.visualViewport?.addEventListener('resize', scheduleLayoutSync);
+window.visualViewport?.addEventListener('scroll', scheduleLayoutSync);
 window.addEventListener('pointermove', (event) => {
   pointerX = event.clientX;
   pointerY = event.clientY;

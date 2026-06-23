@@ -276,16 +276,25 @@ function nearestAudio(osuItem, audioItems, parsed) {
   return veryNear?.item || null;
 }
 
-function nearestBackground(osuItem, imageItems) {
-  const candidates = imageItems
+function nearestBackground(osuItem, imageItems, parsed) {
+  const hasDeclaredBackground = Boolean(parsed?.background);
+  const tightWindow = hasDeclaredBackground ? 1200 : 900;
+  const looseWindow = hasDeclaredBackground ? 2800 : 1800;
+  const usable = imageItems
     .map((item) => ({ item, distance: Math.abs(item.mtime - osuItem.mtime) }))
-    .filter(({ item, distance }) => item.size > 18000 && distance < 3500)
+    .filter(({ item, distance }) => item.size > 18000 && distance < looseWindow);
+
+  const chooseNearest = (candidates) => candidates
     .sort((a, b) => {
-      const scoreA = a.distance / 1000 - Math.min(1.2, Math.log10(Math.max(1, a.item.size)) / 6);
-      const scoreB = b.distance / 1000 - Math.min(1.2, Math.log10(Math.max(1, b.item.size)) / 6);
-      return scoreA - scoreB;
-    });
-  return candidates[0]?.item || null;
+      const delta = a.distance - b.distance;
+      if (Math.abs(delta) > 40) return delta;
+      return b.item.size - a.item.size;
+    })[0]?.item || null;
+
+  const tightMatch = chooseNearest(usable.filter(({ distance }) => distance < tightWindow));
+  if (tightMatch) return tightMatch;
+
+  return hasDeclaredBackground ? null : chooseNearest(usable);
 }
 
 async function scanLazerLibrary(lazerPath) {
@@ -307,7 +316,7 @@ async function scanLazerLibrary(lazerPath) {
       const parsed = parseOsuFile(item.text, '');
       const audio = nearestAudio(item, audioItems, parsed);
       if (!audio) continue;
-      const background = nearestBackground(item, imageItems);
+      const background = nearestBackground(item, imageItems, parsed);
       entries.push({
         id: createHash('sha1').update(item.hash).digest('hex').slice(0, 12),
         source: 'lazer',
