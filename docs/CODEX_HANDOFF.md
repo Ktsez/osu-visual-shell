@@ -4,115 +4,78 @@
 
 仓库：`https://github.com/Ktsez/osu-visual-shell`
 
-项目已经开源，当前定位为 `1.0.0-beta.1`。
+当前定位：`2.0.0-beta.1`
 
-本地服务默认监听：
+默认本地地址：
 
 ```text
 http://127.0.0.1:4173/
 ```
 
-如果用户手动设置：
+当前主分支已经包含 2.0 beta 前的功能修复；文档重写后应再提交一次。
+
+## 已完成能力
+
+- 本地音乐文件夹扫描。
+- osu!stable Songs 扫描。
+- osu!lazer 数据目录检测和扫描。
+- stable `.osu` metadata、背景、timing points、kiai 解析。
+- lazer 音频和背景匹配：优先查 `client.realm` 文件使用记录，再回退到保守匹配。
+- 曲目去重，优先保留带封面条目。
+- 中央圆盘、封面、光晕、留影、冲击波。
+- 圆盘外侧能量柱，带启动保护。
+- 侧灯：kiai 左右交替，普通段强拍双侧闪动。
+- 星星喷泉。
+- Apple Music 风格动态背景。
+- 顶部控制栏。
+- 歌曲列表、扫描面板、设置面板。
+- 中文 / 英文界面，支持跟随浏览器语言。
+- 桌面和手机比例布局。
+- F11 / 窗口尺寸变化后的背景和列表同步。
+
+## 最近验证
+
+已运行：
 
 ```bash
-HOST=0.0.0.0 npm start
+npm test
+node --check server.js
+node --check src/visual/renderer.js
 ```
 
-才会暴露到局域网。
-
-## 已完成改动
-
-### 安全边界
-
-- `server.js` 默认监听 `127.0.0.1`
-- 支持 `HOST` 环境变量覆盖监听地址
-- 启动日志显示真实访问地址
-- README 增加本地监听、隐私和局域网暴露说明
-
-### 后端解析
-
-- `.osu` 解析逻辑已从 `server.js` 抽离到 `src/server/parseOsuFile.js`
-- 解析函数尽量保持纯函数形式：输入 text 和 baseDir，输出解析结果
-- 新增 `node:test` 测试
-
-测试覆盖：
-
-- `AudioFilename`
-- `Title`
-- `TitleUnicode`
-- `Artist`
-- `ArtistUnicode`
-- `Creator`
-- `Version`
-- Events 背景图
-- TimingPoints
-- uninherited timing point
-- inherited timing point
-- kiai effects
-
-### 前端结构
-
-已建立模块目录：
-
-- `src/audio/`
-- `src/osu/`
-- `src/server/`
-- `src/ui/`
-- `src/utils/`
-- `src/visual/`
-
-`src/main.js` 已变成轻入口。
-
-当前主要兼容层是：
-
-```text
-src/visual/renderer.js
-```
-
-它仍保留大量原始视觉、播放、UI 逻辑，用于降低本轮重构风险。
-
-### README
-
-已增强：
-
-- Preview 占位
-- Privacy / 隐私说明
-- Roadmap
-- Known Issues
-- HOST 安全说明
-
-## 最近验证结果
-
-已验证：
-
-- `npm test` 通过
-- 全部 JS `node --check` 通过
-- `npm start` 能启动
-- 服务监听 `127.0.0.1:4173`
-- 首页能打开
-- 普通音乐文件夹扫描返回歌曲
-- osu! Songs 测试目录扫描返回歌曲和 timing points
-- 设置能保存
-- 刷新后设置能保留
-- 点击歌曲后 audio src 能设置
-- 浏览器探针未捕获明显控制台错误
+最近本地验证通过：
+- 侧灯基本正常。
+- 能量柱启动阶段已增加预热保护，用户确认测试通过。
+- 本地服务可启动。
+- lazer 扫描之前验证过可返回约 900+ 条曲目，具体数量取决于用户本机曲库。
 
 ## 当前风险
 
-- 前端模块拆分尚未完全完成，`renderer.js` 仍然偏大。
-- 视觉系统状态耦合较强，能量柱、侧灯、星星喷泉、圆盘律动之间互相影响。
-- 大型 osu! Songs 文件夹扫描仍可能较慢。
-- 浏览器音频播放依赖用户手势。
-- README 中 Preview 图片是占位引用，仓库内未生成真实截图。
+- `src/visual/renderer.js` 仍然过大，改动容易连带影响播放、UI、视觉和设置。
+- lazer Realm 不是通过官方 Realm native 直接读取。Realm native 在当前 Node 环境下打开用户库会卡住，因此使用二进制文件使用记录匹配。这个方案比猜测稳定，但不是完整数据库 ORM。
+- 能量柱、侧灯、星星喷泉都依赖 Web Audio 状态，参数微调需要实际听歌测试。
+- GitHub push 偶尔会因网络连接重置失败。普通重试即可，不建议用 API 写树。
+- Safari 和移动端仍需要持续测试。
 
 ## 下一步建议
 
-1. 不要急着加新功能。
-2. 优先继续把 `renderer.js` 中逻辑逐步下沉到已有模块。
-3. 每次只迁移一类逻辑，并做页面验证。
-4. 增加前端可测试的纯函数覆盖。
-5. 再考虑桌面打包、拖拽选择目录、视觉 preset、性能面板等功能。
+1. 不要立即加大功能。
+2. 继续稳定 2.0 beta。
+3. 增加真实截图或录屏，再更新 README。
+4. 给 lazer 匹配补测试或诊断输出。
+5. 逐步拆分 `src/visual/renderer.js`：
+   - playback/controller
+   - library scanning UI
+   - visualizer bars
+   - side lights
+   - star fountains
+   - settings binding
+6. 增加性能面板，显示 FPS、粒子数、能量柱候选数、扫描耗时。
 
-## 本轮后不要继续做
+## 不要做
 
-本轮用户明确要求：生成/更新交接文档后，不继续改功能。
+- 不要重写整个前端。
+- 不要默认开放局域网访问。
+- 不要接第三方音乐平台。
+- 不要内置任何歌曲、谱面或 osu! 官方资源。
+- 不要为了追求视觉效果无限增加粒子、blur、filter。

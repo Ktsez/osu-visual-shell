@@ -1,86 +1,108 @@
 # AGENTS.md
 
-## 项目概述
+本文写给后续 Codex / AI coding agent。
 
-本项目是 `osu! Visual Shell`，一个本地运行的 osu! 风格音乐视觉外壳。
+## 项目定位
 
-它不是 osu! 客户端，不包含游戏模式，不实现打图、计分、谱面游玩等功能。核心目标是读取用户本机音乐文件夹或 osu! Songs 文件夹，在浏览器中播放音乐，并生成接近 osu! 主菜单音乐舞台的视觉效果。
+`osu! Visual Shell` 是本地运行的 osu! 风格音乐视觉外壳。它不是 osu! 客户端，不做打图、计分、排行榜、账号系统或谱面下载。
 
-## 当前技术栈
+核心目标：
+- 播放用户本机音乐。
+- 扫描 osu!stable Songs 文件夹。
+- 扫描 osu!lazer 本地数据目录。
+- 生成接近 osu! 主菜单音乐舞台的视觉体验。
+
+当前版本定位：`2.0.0-beta.1`。
+
+## 技术栈
 
 - 前端：原生 HTML / CSS / JavaScript / Canvas
 - 音频：Web Audio API
 - 后端：Node.js 本地 HTTP 服务
 - 测试：Node.js 内置 `node:test`
-- 启动：`npm start`
 - 默认地址：`http://127.0.0.1:4173/`
 
 ## 重要约束
 
 - 不要新建项目。
-- 不要重写项目。
-- 不要引入 React / Vue / Svelte。
-- 不要引入大型依赖。
-- 不要把本地服务默认暴露到局域网。
+- 不要整体重写。
+- 不要引入 React / Vue / Svelte 等前端框架。
+- 不要默认暴露到局域网。
 - 不要上传用户音乐、谱面、背景图或 metadata。
-- 不要改掉现有视觉风格，除非用户明确要求。
-- 不要删除现有设置项。
-- 不要随意更改 localStorage key。
-- 不要在没有验证的情况下声称功能正常。
+- 不要内置 osu! 官方资源、音乐或谱面。
+- 不要随意改 localStorage key。
+- 不要把视觉参数一次性大幅改动，尤其是能量柱、侧灯、星星喷泉。
 
-## 工作方式
+## 当前关键文件
 
-修改前先看当前代码结构和 git 状态。
+- `server.js`：本地服务、扫描、media URL。
+- `src/main.js`：前端轻入口。
+- `src/visual/renderer.js`：主要 UI、播放、Canvas 视觉、音频分析逻辑。
+- `src/server/parseOsuFile.js`：`.osu` 解析。
+- `src/ui/settings.js`：默认设置和 localStorage key。
+- `index.html`：页面结构和设置项。
+- `src/style.css`：布局、圆盘、侧灯、面板样式。
 
-业务代码变更后至少运行：
+## 当前重点状态
+
+- stable Songs 扫描可用。
+- lazer 检测和扫描可用。
+- lazer 匹配优先使用 `client.realm` 二进制中的文件使用记录，再保守回退。
+- 侧灯逻辑已调整为：kiai 左右交替，普通段强拍双侧闪动。
+- 能量柱有启动保护，避免歌曲开头整圈炸满。
+- 顶部栏、列表、背景已做响应式和 F11 尺寸同步。
+- README 和 docs 已按 2.0 beta 重写。
+
+## 修改前检查
+
+先看：
+
+```bash
+git status --short --branch
+```
+
+修改业务代码后至少运行：
 
 ```bash
 npm test
 node --check server.js
+node --check src/visual/renderer.js
 ```
 
-前端变更后应验证：
+如果改了前端视觉，还要本地打开：
 
-- 页面能打开
-- 控制台无明显错误
-- 扫描普通音乐目录正常
-- 扫描 osu! Songs 目录正常
-- 点击歌曲后音频源被设置
-- 设置面板能保存，刷新后仍保留
+```text
+http://127.0.0.1:4173/
+```
 
-每次完成有效改动后，应提交 git 版本并推送。
+验证：
+- 页面能打开。
+- 扫描 stable / lazer 不报错。
+- 歌曲能播放、暂停、切换。
+- 设置面板能打开并保存。
+- F11 / 改窗口尺寸后背景和列表不乱。
+- 能量柱开头不炸满。
+- 侧灯不在无鼓点时乱闪。
 
-## 当前结构
+## Git 规则
 
-入口：
+用户要求每次有效改动都留 git 版本。
 
-- `server.js`
-- `src/main.js`
+常规流程：
 
-后端解析：
+```bash
+git add ...
+git commit -m "..."
+git -c http.version=HTTP/1.1 push origin main
+```
 
-- `src/server/parseOsuFile.js`
+GitHub push 偶尔会连接重置。可以重试普通 push。不要用 GitHub API 写树替代普通 push，除非用户明确要求，因为历史上远端曾被 API 写树事故破坏过。
 
-前端模块边界：
+## 维护优先级
 
-- `src/audio/`
-- `src/osu/`
-- `src/ui/`
-- `src/utils/`
-- `src/visual/`
-
-注意：当前前端拆分是低风险 beta 拆分。`src/visual/renderer.js` 仍是主要兼容层，承接大量旧逻辑。不要误以为所有职责已经完全下沉到子模块。
-
-## 常见风险
-
-- `renderer.js` 中视觉状态高度耦合，修改时容易影响能量柱、侧灯、星星喷泉和圆盘律动。
-- Web Audio 需要用户手势解锁，自动播放失败不一定是 bug。
-- `.osu` 解析要兼容 unicode metadata、inherited timing point、kiai effects。
-- Windows 路径、URL 编码、媒体 range 请求都要谨慎处理。
-
-## 推荐优先级
-
-1. 保持现有功能稳定。
-2. 增加测试覆盖。
-3. 逐步把 `renderer.js` 中的逻辑下沉到已有模块。
-4. 再考虑新功能。
+1. 稳定现有体验。
+2. 修复扫描和媒体匹配准确性。
+3. 修复视觉卡顿和尺寸适配。
+4. 增加测试。
+5. 逐步拆分 `src/visual/renderer.js`。
+6. 最后再考虑新功能。

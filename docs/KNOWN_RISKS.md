@@ -1,142 +1,126 @@
 # 已知风险
 
-## 1. `src/visual/renderer.js` 仍然过大
+## 1. `renderer.js` 仍然过大
 
-当前前端拆分是 beta 阶段的低风险拆分。
-
-`renderer.js` 仍然包含：
-
+`src/visual/renderer.js` 同时包含：
 - 播放控制
 - UI 状态
 - timing 更新
-- 音频能量更新
-- 视觉绘制
-- 粒子
-- 星星喷泉
-- 侧灯
+- 音频分析
+- Canvas 绘制
 - 能量柱
+- 侧灯
+- 星星喷泉
+- 背景和圆盘状态
 
-风险：修改其中一个效果，可能影响其它效果。
+风险：改一个效果可能影响多个系统。
 
-建议：后续按功能逐块迁移，不要一次性大改。
+建议：后续按功能逐步拆分，不要一次性大重构。
 
-## 2. 视觉状态互相耦合
-
-这些变量之间关系复杂：
-
-- `smoothedEnergy`
-- `logoPulse`
-- `coreBreath`
-- `coreFlash`
-- `sectionHeat`
-- `lightEnergy`
-- `leftFlash`
-- `rightFlash`
-- `starParticles`
-- `visualizerBars`
-
-风险：调一个参数可能让圆盘、能量柱、侧灯和星星喷泉同时变化。
-
-建议：修改视觉逻辑后必须手动播放音乐验证。
-
-## 3. 能量柱容易被改没
+## 2. 能量柱容易失控
 
 能量柱依赖：
+- Web Audio `freqData`
+- `previousVisualizerBins`
+- `visualizerBars`
+- 启动预热
+- 候选峰值数量
+- spread 半径
+- decay 和 attack
 
-- Web Audio freqData
-- visualizerBars 衰减
-- 峰值筛选
-- Canvas 绘制
+已发生过的问题：
+- 歌曲开头整圈炸满。
+- 能量柱太稀疏。
+- 能量柱过多导致卡顿。
 
-之前出现过能量柱消失问题。
+当前已有启动保护。后续修改时必须验证新歌开始前 10 秒。
 
-建议：任何性能优化都要确认能量柱仍可见。
+## 3. 侧灯容易被 timing 和音频拉扯
 
-## 4. 星星喷泉容易过载或消失
+侧灯由 timing beat 触发，但亮度依赖音频能量。
 
-星星喷泉依赖：
+已发生过的问题：
+- 左右交替时一边亮一边暗。
+- kiai 和双侧闪互相插队。
+- 无明显鼓点时乱闪。
 
-- kiai 标记
-- 音频 rise / drive
-- 冷却时间
-- 粒子数量限制
-- Canvas glow 绘制
+当前处理：
+- kiai 段左右交替。
+- 普通段强拍双侧闪。
+- 左右交替使用统一节拍亮度，不直接使用左右声道差。
+- 增加音频门槛。
+
+后续修改必须实际播放不同歌曲验证。
+
+## 4. lazer 匹配不是完整 ORM
+
+osu!lazer 使用 `client.realm` 和 `files/`。文件名是 SHA-256，不是 stable 那种目录结构。
+
+尝试过 Realm native 直接打开用户库，但当前 Node 环境会长时间卡住。因此当前实现通过读取 `client.realm` 二进制中的文件使用记录来匹配 `.osu hash + AudioFilename / BackgroundFile`。
 
 风险：
+- 未来 lazer Realm 格式变化可能影响匹配。
+- 二进制匹配不是官方数据库查询。
 
-- 条件太严格会不触发
-- 条件太宽会卡顿
-- glow 太强会遮挡画面
+建议：
+- 保留保守回退。
+- 后续加入诊断输出和测试 fixture。
 
-建议：用普通歌曲和 kiai 谱面都测试。
+## 5. 浏览器尺寸和 Safari 兼容
 
-## 5. 浏览器音频播放限制
+项目使用 fixed canvas、fixed 背景、CSS 变量、`100dvh`、`visualViewport`。
 
-浏览器可能要求用户点击后才允许播放音频。
+已发生过的问题：
+- Safari 下 Canvas 和 DOM 圆盘不同心。
+- F11 后背景新区域未铺满。
+- 列表高度不随窗口变化。
 
-这不是服务端问题。
+当前已有 resize/fullscreen/orientation/pageshow 同步。后续改布局必须测试桌面、竖屏和 F11。
 
-建议：播放失败提示应保留，不要移除。
+## 6. 粒子和滤镜性能
 
-## 6. 本地路径和 URL 编码
+高风险效果：
+- 星星喷泉
+- 大面积 blur
+- background blend
+- Canvas glow
+- 多层能量柱
 
-扫描依赖用户本地路径。
+风险：高强度歌曲会掉帧。
 
-风险点：
+建议：
+- 控制粒子数量。
+- 控制 glow 范围。
+- 不要无限增加 CSS filter。
+- 加性能面板前不要盲目加视觉层。
 
-- Windows 反斜杠
-- 中文路径
-- 空格
-- URL encode/decode
-- osu! 文件夹层级
+## 7. 本地 media 服务安全
 
-建议：修改扫描逻辑后，用中文路径和普通路径都验证。
+`/media/:id` 暴露扫描到的本地媒体，但 id 不直接包含路径。
 
-## 7. `.osu` 解析兼容性
+安全边界依赖：
+- 默认监听 `127.0.0.1`。
+- 只服务扫描过的文件。
+- 用户主动设置 `HOST=0.0.0.0` 才开放局域网。
 
-当前解析覆盖常见字段，但 osu! 谱面文件格式存在很多边缘情况。
+后续不要默认改为 `0.0.0.0`。
 
-风险点：
+## 8. 编码和文档
 
-- metadata 中包含冒号
-- unicode 字段为空
-- Events 行格式变化
-- inherited timing point
-- effects 位标记
+之前 README 和 docs 出现过中文编码损坏。
 
-建议：新增 bug 前先补 fixture 测试。
+建议：
+- 文档统一保存为 UTF-8。
+- PowerShell 查看中文可能显示异常时，不要直接判断文件已坏，必要时用编辑器或浏览器确认。
 
-## 8. 本地媒体服务安全
+## 9. GitHub push 不稳定
 
-`/media/:id` 通过内存 map 暴露扫描到的本地媒体。
+用户环境中 GitHub HTTPS push 偶尔连接重置。
 
-当前安全边界依赖：
+可尝试：
 
-- 默认只监听 `127.0.0.1`
-- media id 不直接暴露原路径
-- 只有扫描过的文件进入 map
+```bash
+git -c http.version=HTTP/1.1 push origin main
+```
 
-风险：如果用户设置 `HOST=0.0.0.0`，局域网设备可能访问已扫描媒体。
-
-建议：README 中必须保留 HOST 风险说明。
-
-## 9. README Preview 是占位
-
-README 中引用：
-
-- `docs/screenshots/main.png`
-- `docs/screenshots/settings.png`
-
-当前未生成真实图片。
-
-风险：GitHub README 会显示图片缺失。
-
-建议：后续添加真实截图，或在 release 前确认是否接受占位。
-
-## 10. 不要默认改变 localStorage key
-
-用户设置保存在 localStorage。
-
-风险：改 key 会导致用户现有设置丢失。
-
-建议：只有默认设置结构不兼容时才迁移 key，并在 README 或交接文档说明。
+不要默认使用 GitHub API 写树替代普通 push。
