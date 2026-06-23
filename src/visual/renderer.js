@@ -112,6 +112,7 @@ let coreFlash = 0;
 let coreGhostScale = 1;
 let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
+let visualizerPrimed = false;
 let lastAudioFountainAt = -10000;
 let ambientToken = 0;
 let sideMode = 'idle';
@@ -939,6 +940,7 @@ async function playIndex(index) {
   lastRippleAt = -10000;
   visualizerBars.fill(0);
   previousVisualizerBins.fill(0);
+  visualizerPrimed = false;
   markActiveTrack();
   if (track.timingPoints?.length) {
     setStatusKey('loadedTiming', { count: track.timingPoints.length });
@@ -1334,13 +1336,27 @@ function updateLogoAmplitudes(now, elapsed) {
   lastVisualizerUpdate = now;
 
   const kiaiMultiplier = activeEffectPoint?.kiai ? 1 : 0.5;
-  const dynamicRange = 0.1 + Math.max(0.04, amplitudeAverage) * 1.08;
+  const trackTime = audio.currentTime || 0;
+  const warmupRaw = Math.min(1, Math.max(0, (trackTime - 0.35) / 8));
+  const warmup = warmupRaw * warmupRaw * (3 - 2 * warmupRaw);
+  const startupGuard = 0.28 + warmup * 0.72;
+  const dynamicRange = 0.1 + Math.max(0.04, amplitudeAverage) * 1.08 + (1 - warmup) * 0.12;
   const userScale = 0.6 + Math.max(0, settings.visualizer) * 0.32;
   const noiseFloor = Math.max(0.03, amplitudeAverage * 0.25);
   const contrast = Math.max(0.1, settings.visualizerContrast || 1.6);
-  const startupLimiter = Math.min(1, Math.max(0.18, (audio.currentTime || 0) / 2.8));
-  const attackLimit = (0.022 + Math.min(0.075, audioAmplitude * 0.09)) * (activeEffectPoint?.kiai ? 1.18 : 1);
+  const startupLimiter = Math.min(1, Math.max(0.08, trackTime / 4.5)) * startupGuard;
+  const attackLimit = (0.014 + Math.min(0.062, audioAmplitude * 0.075)) * (activeEffectPoint?.kiai ? 1.12 : 1) * (0.42 + warmup * 0.58);
   const candidates = [];
+
+  if (!visualizerPrimed) {
+    for (let i = 0; i < visualizerBars.length; i += 1) {
+      const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
+      previousVisualizerBins[i] = (freqData[sourceIndex] || 0) / 255;
+    }
+    visualizerPrimed = true;
+    visualizerOffset = (visualizerOffset + 5) % visualizerBars.length;
+    return;
+  }
 
   for (let i = 0; i < visualizerBars.length; i += 1) {
     const sourceIndex = (i + visualizerOffset) % visualizerBars.length;
@@ -1357,17 +1373,20 @@ function updateLogoAmplitudes(now, elapsed) {
     const normalised = peak / dynamicRange;
     const compressed = Math.min(1, normalised);
     const shaped = Math.pow(compressed, contrast * 0.9);
-    const target = Math.min(0.76, shaped * (0.4 + contrast * 0.1) * kiaiMultiplier * userScale * startupLimiter);
+    const target = Math.min(0.72, shaped * (0.4 + contrast * 0.1) * kiaiMultiplier * userScale * startupLimiter);
     if (target > visualizerBars[i]) candidates.push({ index: i, target, score: target + freshLift * 0.5 });
   }
 
+  const candidateLimit = Math.round((activeEffectPoint?.kiai ? 20 : 14) + warmup * (activeEffectPoint?.kiai ? 24 : 18));
+  const spreadRadius = warmup < 0.42 ? 1 : 2;
+
   candidates
     .sort((a, b) => b.score - a.score)
-    .slice(0, activeEffectPoint?.kiai ? 44 : 32)
+    .slice(0, candidateLimit)
     .forEach(({ index, target }) => {
-      for (let spread = -2; spread <= 2; spread += 1) {
+      for (let spread = -spreadRadius; spread <= spreadRadius; spread += 1) {
         const wrapped = (index + spread + visualizerBars.length) % visualizerBars.length;
-        const falloff = spread === 0 ? 1 : spread === -1 || spread === 1 ? 0.54 : 0.24;
+        const falloff = spread === 0 ? 1 : Math.abs(spread) === 1 ? 0.54 : 0.24;
         const spreadTarget = target * falloff;
         if (spreadTarget > visualizerBars[wrapped]) {
           visualizerBars[wrapped] = Math.min(spreadTarget, visualizerBars[wrapped] + attackLimit * falloff);
