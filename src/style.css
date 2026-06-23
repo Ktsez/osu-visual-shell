@@ -16,6 +16,8 @@
   --aura-breath: 0;
   --ghost-intensity: 0.8;
   --ghost-blur: 0.1;
+  --viewport-width: 100vw;
+  --viewport-height: 100vh;
   color: #fff;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -31,6 +33,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--viewport-height);
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 48%, rgba(255, 78, 174, 0.2), transparent 26rem),
@@ -64,10 +68,16 @@ button:hover,
 #shade {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  width: var(--viewport-width);
+  height: 100vh;
+  height: 100dvh;
+  height: var(--viewport-height);
 }
 
 #stage {
   z-index: 2;
+  display: block;
   pointer-events: none;
 }
 
@@ -95,12 +105,16 @@ button:hover,
   position: relative;
   z-index: 3;
   min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--viewport-height);
   contain: layout paint;
 }
 
 .visual {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--viewport-height);
 }
 
 .core {

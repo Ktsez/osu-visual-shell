@@ -281,10 +281,43 @@ function handleBlankDismiss(event) {
   return true;
 }
 
+function readStageSize() {
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width || document.documentElement.clientWidth || window.visualViewport?.width || window.innerWidth;
+  const height = rect.height || document.documentElement.clientHeight || window.visualViewport?.height || window.innerHeight;
+  return {
+    width: Math.max(1, width),
+    height: Math.max(1, height),
+  };
+}
+
+function syncCanvasSize() {
+  const { width, height } = readStageSize();
+  const ratio = Math.max(1, window.devicePixelRatio || 1);
+  const backingWidth = Math.max(1, Math.round(width * ratio));
+  const backingHeight = Math.max(1, Math.round(height * ratio));
+  if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
+    canvas.width = backingWidth;
+    canvas.height = backingHeight;
+  }
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  setCssVar('--viewport-width', `${width.toFixed(2)}px`);
+  setCssVar('--viewport-height', `${height.toFixed(2)}px`);
+  return { width, height, ratio };
+}
+
+function coreVisualMetrics(stageWidth, stageHeight) {
+  const rect = core.getBoundingClientRect();
+  const hasRect = rect.width > 0 && rect.height > 0;
+  return {
+    cx: hasRect ? rect.left + rect.width / 2 : stageWidth * 0.5,
+    cy: hasRect ? rect.top + rect.height / 2 : stageHeight * 0.5,
+    size: core.offsetWidth || rect.width || Math.min(stageWidth, stageHeight) * 0.66,
+  };
+}
+
 function resize() {
-  canvas.width = window.innerWidth * devicePixelRatio;
-  canvas.height = window.innerHeight * devicePixelRatio;
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  syncCanvasSize();
 }
 
 function setupAudioGraph() {
@@ -872,8 +905,7 @@ function updateLogoAmplitudes(now, elapsed) {
 }
 
 function spawnBurst(count = 10) {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  const { width, height } = readStageSize();
   const cx = width * 0.5;
   const cy = height * 0.5;
 
@@ -970,8 +1002,7 @@ function triggerStarFountain(power = 1, reason = 'kiai') {
 }
 
 function updateStarFountains(now, elapsed) {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  const { width, height } = readStageSize();
   const originOffset = Math.min(260, Math.max(120, width * 0.16));
   const dt = elapsed / 1000;
   let spawnsThisFrame = 0;
@@ -1055,14 +1086,14 @@ function drawStarGlow(ctx, x, y, radius, alpha) {
   ctx.restore();
 }
 
-function drawRippleRings(cx, cy, coreSize, now) {
+function drawRippleRings(cx, cy, coreSize, now, stageWidth, stageHeight) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.globalCompositeOperation = 'lighter';
   for (const ring of rippleRings) {
     const progress = Math.max(0, Math.min(1, (now - ring.start) / ring.duration));
     const eased = 1 - Math.pow(1 - progress, 2.05);
-    const maxRadius = Math.min(window.innerWidth, window.innerHeight) * 0.67 * Math.max(0.05, settings.waveSize);
+    const maxRadius = Math.min(stageWidth, stageHeight) * 0.67 * Math.max(0.05, settings.waveSize);
     const radius = coreSize * 0.46 + eased * maxRadius;
     const fade = Math.pow(1 - progress, 1.06);
     const alpha = fade * (0.34 + ring.power * 0.28) * Math.max(0, settings.waveIntensity);
@@ -1137,14 +1168,14 @@ function draw() {
     document.body.classList.add('is-idle');
   }
 
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  const { width, height } = syncCanvasSize();
   ctx.clearRect(0, 0, width, height);
 
   const beatMotion = !audio.paused ? continuousBeat * 0.015 : 0;
   const energy = Math.max(smoothedEnergy * 1.08, logoPulse * 0.34, coreBreath * 0.92, beatMotion);
   const earlyDip = timingPulse > 0.5 ? -0.005 * Math.min(1, timingPulse) : 0;
-  const coreSize = core.offsetWidth || Math.min(width, height) * 0.66;
+  const coreMetrics = coreVisualMetrics(width, height);
+  const coreSize = coreMetrics.size;
   const targetFollowX = coreHover ? Math.max(-9, Math.min(9, (pointerX - width / 2) * 0.045)) : 0;
   const targetFollowY = coreHover ? Math.max(-9, Math.min(9, (pointerY - height / 2) * 0.045)) : 0;
   coreFollowX += (targetFollowX - coreFollowX) * Math.min(1, elapsed / 120);
@@ -1182,6 +1213,9 @@ function draw() {
     scytheEventCount: scytheEvents.length,
     starParticles: starParticles.length,
     fountainBursts: fountainBursts.length,
+    stageSize: [width, height],
+    visualCenter: [coreMetrics.cx, coreMetrics.cy],
+    coreSize,
     settings,
     paused: audio.paused,
     currentTime: audio.currentTime,
@@ -1223,10 +1257,8 @@ function draw() {
   setCssVar('--left-hard', Math.min(1, leftHard).toFixed(2));
   setCssVar('--right-hard', Math.min(1, rightHard).toFixed(2));
 
-  const cx = width * 0.5;
-  const cy = height * 0.5;
-  drawRippleRings(cx + coreFollowX, cy + coreFollowY, coreSize, now);
-  drawLogoVisualizer(cx + coreFollowX, cy + coreFollowY, coreSize);
+  drawRippleRings(coreMetrics.cx, coreMetrics.cy, coreSize, now, width, height);
+  drawLogoVisualizer(coreMetrics.cx, coreMetrics.cy, coreSize);
 
   for (const particle of particles) {
     particle.x += particle.vx;
@@ -1310,6 +1342,8 @@ function drawLogoVisualizer(cx, cy, coreSize) {
 }
 
 window.addEventListener('resize', resize);
+window.visualViewport?.addEventListener('resize', resize);
+window.visualViewport?.addEventListener('scroll', resize);
 window.addEventListener('pointermove', (event) => {
   pointerX = event.clientX;
   pointerY = event.clientY;
