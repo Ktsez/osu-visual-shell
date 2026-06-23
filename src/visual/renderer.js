@@ -291,7 +291,7 @@ const blankDismissDelayMs = 300;
 
 function touch(panel = null) {
   lastInteraction = performance.now();
-  if (panel || app.dataset.panel !== 'idle') document.body.classList.remove('is-idle');
+  document.body.classList.remove('is-idle');
   if (panel) {
     markUiAction();
     app.dataset.panel = panel;
@@ -1420,8 +1420,8 @@ function draw() {
     if (!envelopeAlive(sideEnvelopes[key], now)) sideEnvelopes[key] = null;
   }
 
-  if (now - lastInteraction > idleAfterMs && app.dataset.panel !== 'idle') {
-    app.dataset.panel = 'idle';
+  if (now - lastInteraction > idleAfterMs) {
+    if (app.dataset.panel !== 'idle') app.dataset.panel = 'idle';
     document.body.classList.add('is-idle');
   }
 
@@ -1644,9 +1644,9 @@ document.querySelector('#top-scan').addEventListener('click', () => setPanel('sc
 document.querySelector('#top-library').addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
 document.querySelector('#top-settings').addEventListener('click', () => setPanel('settings'));
 minimizeControls.addEventListener('click', () => setPanel('idle'));
-document.querySelector('#close-scan').addEventListener('click', () => setPanel('controls'));
-document.querySelector('#close-library').addEventListener('click', () => setPanel('controls'));
-document.querySelector('#close-settings').addEventListener('click', () => setPanel('controls'));
+document.querySelector('#close-scan').addEventListener('click', () => setPanel('idle'));
+document.querySelector('#close-library').addEventListener('click', () => setPanel('idle'));
+document.querySelector('#close-settings').addEventListener('click', () => setPanel('idle'));
 document.querySelector('#detect-osu').addEventListener('click', detectOsu);
 document.querySelector('#scan-osu').addEventListener('click', () => scan('osu'));
 document.querySelector('#scan-music').addEventListener('click', () => scan('music'));

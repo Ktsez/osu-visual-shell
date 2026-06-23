@@ -33,10 +33,18 @@
               <p id="top-meta" data-i18n="scanPrompt">请先扫描本地曲库</p>
             </div>
           </div>
-          <div class="top-transport">
-            <button id="top-prev" type="button" class="top-icon" aria-label="上一首" data-i18n-aria="previous">‹</button>
-            <button id="top-play" type="button" class="top-play" data-i18n="play">播放</button>
-            <button id="top-next" type="button" class="top-icon" aria-label="下一首" data-i18n-aria="next">›</button>
+          <div class="top-playback">
+            <div class="top-transport">
+              <button id="top-prev" type="button" class="top-icon" aria-label="上一首" data-i18n-aria="previous">‹</button>
+              <button id="top-play" type="button" class="top-play" data-i18n="play">播放</button>
+              <button id="top-next" type="button" class="top-icon" aria-label="下一首" data-i18n-aria="next">›</button>
+            </div>
+            <div class="top-progress-row">
+              <span id="time-current">0:00</span>
+              <input id="progress" class="progress" type="range" min="0" max="1000" value="0" aria-label="歌曲进度" data-i18n-aria="progress" />
+              <span id="time-total">0:00</span>
+            </div>
+            <p id="status" class="status" data-i18n="readyStatus">就绪。可以检测本地 osu! Songs。</p>
           </div>
           <nav class="top-actions" aria-label="快捷操作" data-i18n-aria="quickActions">
             <button id="top-scan" type="button" data-i18n="scan">扫描</button>
@@ -69,12 +77,6 @@
             </div>
           </div>
 
-          <input id="progress" class="progress" type="range" min="0" max="1000" value="0" aria-label="歌曲进度" data-i18n-aria="progress" />
-          <div class="time-row">
-            <span id="time-current">0:00</span>
-            <span id="time-total">0:00</span>
-          </div>
-
           <div class="transport">
             <button id="prev" type="button" data-i18n="previous">上一首</button>
             <button id="toggle-play" type="button" data-i18n="play">播放</button>
@@ -86,8 +88,6 @@
             <button id="open-library" type="button" data-i18n="library">歌曲列表</button>
             <button id="open-settings" type="button" data-i18n="settings">设置</button>
           </div>
-
-          <p id="status" class="status" data-i18n="readyStatus">就绪。可以检测本地 osu! Songs。</p>
         </div>
 
         <section id="scan-panel" class="float-panel scan-panel wedge-panel" aria-label="扫描文件夹" data-i18n-aria="scanFolder">
