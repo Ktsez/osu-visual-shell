@@ -9,16 +9,60 @@ export async function fetchJson(url) {
 
 export function dedupeTracks(input) {
   const best = new Map();
+  const aliases = new Map();
   for (const track of input) {
-    const audioKey = normaliseKey(track.audioUrl || track.path || '');
-    const titleKey = normaliseKey(`${track.artist || ''}::${track.title || ''}`);
-    const key = track.source === 'osu' ? `${titleKey}::${audioKey}` : audioKey || titleKey;
-    const current = best.get(key);
-    const score = (track.timingPoints?.length || 0) + (track.backgroundUrl ? 2 : 0);
-    const currentScore = (current?.timingPoints?.length || 0) + (current?.backgroundUrl ? 2 : 0);
-    if (!current || score > currentScore) best.set(key, track);
+    const keys = trackIdentityKeys(track);
+    const existingKey = keys.map((key) => aliases.get(key)).find(Boolean);
+    const canonicalKey = existingKey || keys[0];
+    const current = best.get(canonicalKey);
+    if (!current || trackDedupeScore(track) > trackDedupeScore(current)) best.set(canonicalKey, track);
+    for (const key of keys) aliases.set(key, canonicalKey);
   }
   return [...best.values()].sort((a, b) => `${a.artist} ${a.title}`.localeCompare(`${b.artist} ${b.title}`, 'zh-CN'));
+}
+
+function trackIdentityKeys(track) {
+  const audioKey = normaliseAudioKey(track.audioUrl || track.path || '');
+  const folderKey = normaliseFolderAudioKey(track.audioUrl || track.path || '');
+  const titleKey = normaliseKey(`${track.artist || ''}::${track.title || ''}`);
+  const looseTitleKey = normaliseTitleKey(`${track.artist || ''}::${track.title || ''}`);
+  const keys = [
+    audioKey && `audio:${audioKey}`,
+    folderKey && `folder-audio:${folderKey}`,
+    titleKey && `title:${titleKey}`,
+    looseTitleKey && `loose-title:${looseTitleKey}`,
+  ].filter(Boolean);
+  return [...new Set(keys.length ? keys : [`fallback:${Math.random()}`])];
+}
+
+function trackDedupeScore(track) {
+  return (track.backgroundUrl ? 120 : 0)
+    + (track.timingPoints?.length || 0)
+    + (track.version ? 4 : 0)
+    + (track.audioUrl ? 2 : 0);
+}
+
+function normaliseAudioKey(value) {
+  return normaliseKey(value)
+    .replace(/^\/media\//, '')
+    .replace(/[?#].*$/, '')
+    .replace(/%20/g, ' ');
+}
+
+function normaliseFolderAudioKey(value) {
+  const parts = normaliseAudioKey(value).split('/').filter(Boolean);
+  if (parts.length < 2) return normaliseAudioKey(value);
+  return parts.slice(-2).join('/');
+}
+
+function normaliseTitleKey(value) {
+  return normaliseKey(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, '')
+    .replace(/\b(tv size|short ver|full ver|mapped by|feat|ft)\b/g, '')
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, ' ')
+    .trim();
 }
 
 export function filterTracks(tracks, query) {

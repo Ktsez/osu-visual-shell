@@ -113,6 +113,7 @@ let coreGhostScale = 1;
 let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
 let lastAudioFountainAt = -10000;
+let ambientToken = 0;
 const cssVarCache = new Map();
 const textCache = new WeakMap();
 
@@ -285,7 +286,7 @@ const i18n = {
   },
 };
 
-const idleAfterMs = 6000;
+const idleAfterMs = 3000;
 const sideFlashEarlyMs = 65;
 const blankDismissDelayMs = 300;
 
@@ -630,20 +631,64 @@ async function scan(kind) {
 
 function dedupeTracks(input) {
   const best = new Map();
+  const aliases = new Map();
   for (const track of input) {
-    const audioKey = normaliseKey(track.audioUrl || track.path || '');
-    const titleKey = normaliseKey(`${track.artist || ''}::${track.title || ''}`);
-    const key = track.source === 'osu' ? `${titleKey}::${audioKey}` : audioKey || titleKey;
-    const current = best.get(key);
-    const score = (track.timingPoints?.length || 0) + (track.backgroundUrl ? 2 : 0);
-    const currentScore = (current?.timingPoints?.length || 0) + (current?.backgroundUrl ? 2 : 0);
-    if (!current || score > currentScore) best.set(key, track);
+    const keys = trackIdentityKeys(track);
+    const existingKey = keys.map((key) => aliases.get(key)).find(Boolean);
+    const canonicalKey = existingKey || keys[0];
+    const current = best.get(canonicalKey);
+    if (!current || trackDedupeScore(track) > trackDedupeScore(current)) best.set(canonicalKey, track);
+    for (const key of keys) aliases.set(key, canonicalKey);
   }
   return [...best.values()].sort((a, b) => `${a.artist} ${a.title}`.localeCompare(`${b.artist} ${b.title}`, 'zh-CN'));
 }
 
+function trackIdentityKeys(track) {
+  const audioKey = normaliseAudioKey(track.audioUrl || track.path || '');
+  const folderKey = normaliseFolderAudioKey(track.audioUrl || track.path || '');
+  const titleKey = normaliseKey(`${track.artist || ''}::${track.title || ''}`);
+  const looseTitleKey = normaliseTitleKey(`${track.artist || ''}::${track.title || ''}`);
+  const keys = [
+    audioKey && `audio:${audioKey}`,
+    folderKey && `folder-audio:${folderKey}`,
+    titleKey && `title:${titleKey}`,
+    looseTitleKey && `loose-title:${looseTitleKey}`,
+  ].filter(Boolean);
+  return [...new Set(keys.length ? keys : [`fallback:${Math.random()}`])];
+}
+
+function trackDedupeScore(track) {
+  return (track.backgroundUrl ? 120 : 0)
+    + (track.timingPoints?.length || 0)
+    + (track.version ? 4 : 0)
+    + (track.audioUrl ? 2 : 0);
+}
+
 function normaliseKey(value) {
   return String(value || '').trim().toLowerCase().replaceAll('\\', '/').replace(/\s+/g, ' ');
+}
+
+function normaliseAudioKey(value) {
+  return normaliseKey(value)
+    .replace(/^\/media\//, '')
+    .replace(/[?#].*$/, '')
+    .replace(/%20/g, ' ');
+}
+
+function normaliseFolderAudioKey(value) {
+  const parts = normaliseAudioKey(value).split('/').filter(Boolean);
+  if (parts.length < 2) return normaliseAudioKey(value);
+  return parts.slice(-2).join('/');
+}
+
+function normaliseTitleKey(value) {
+  return normaliseKey(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, '')
+    .replace(/\b(tv size|short ver|full ver|mapped by|feat|ft)\b/g, '')
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, ' ')
+    .trim();
 }
 
 function renderList() {
@@ -685,6 +730,108 @@ function escapeHtml(value) {
   })[char]);
 }
 
+function setAmbientFallback() {
+  ambientToken += 1;
+  background.classList.remove('has-cover');
+  background.style.removeProperty('--ambient-cover');
+  setCssVar('--ambient-a', '210, 48, 142');
+  setCssVar('--ambient-b', '72, 32, 118');
+  setCssVar('--ambient-c', '18, 10, 32');
+}
+
+async function setAmbientFromTrack(track) {
+  const url = track?.backgroundUrl || '';
+  const token = ++ambientToken;
+  if (!url) {
+    setAmbientFallback();
+    return;
+  }
+
+  background.classList.add('has-cover');
+  background.style.setProperty('--ambient-cover', `url("${url}")`);
+
+  try {
+    const palette = await extractPalette(url);
+    if (token !== ambientToken) return;
+    setCssVar('--ambient-a', palette[0]);
+    setCssVar('--ambient-b', palette[1]);
+    setCssVar('--ambient-c', palette[2]);
+  } catch {
+    if (token === ambientToken) setAmbientFallback();
+  }
+}
+
+function extractPalette(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      try {
+        const size = 56;
+        const sample = document.createElement('canvas');
+        sample.width = size;
+        sample.height = size;
+        const sampleCtx = sample.getContext('2d', { willReadFrequently: true });
+        sampleCtx.drawImage(image, 0, 0, size, size);
+        const { data } = sampleCtx.getImageData(0, 0, size, size);
+        const buckets = new Map();
+
+        for (let i = 0; i < data.length; i += 16) {
+          const alpha = data[i + 3] / 255;
+          if (alpha < 0.35) continue;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const brightness = max / 255;
+          const saturation = max ? (max - min) / max : 0;
+          if (brightness < 0.08) continue;
+          const qr = Math.round(r / 24) * 24;
+          const qg = Math.round(g / 24) * 24;
+          const qb = Math.round(b / 24) * 24;
+          const key = `${qr},${qg},${qb}`;
+          const weight = alpha * (0.25 + saturation * 1.15) * (0.34 + brightness * 0.9);
+          const bucket = buckets.get(key) || { r: 0, g: 0, b: 0, weight: 0, count: 0 };
+          bucket.r += r * weight;
+          bucket.g += g * weight;
+          bucket.b += b * weight;
+          bucket.weight += weight;
+          bucket.count += 1;
+          buckets.set(key, bucket);
+        }
+
+        const colours = [...buckets.values()]
+          .filter((bucket) => bucket.weight > 0)
+          .map((bucket) => ({
+            r: Math.round(bucket.r / bucket.weight),
+            g: Math.round(bucket.g / bucket.weight),
+            b: Math.round(bucket.b / bucket.weight),
+            score: bucket.weight * Math.sqrt(bucket.count),
+          }))
+          .sort((a, b) => b.score - a.score);
+
+        const primary = colours[0] || { r: 210, g: 48, b: 142 };
+        const secondary = colours.find((colour) => colourDistance(colour, primary) > 58) || colours[1] || { r: 74, g: 34, b: 124 };
+        const tertiary = colours.find((colour) => colourDistance(colour, primary) > 34 && colourDistance(colour, secondary) > 34) || colours[2] || { r: 20, g: 12, b: 34 };
+        resolve([primary, secondary, tertiary].map(formatRgb));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+function colourDistance(a, b) {
+  return Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
+}
+
+function formatRgb(colour) {
+  return `${colour.r}, ${colour.g}, ${colour.b}`;
+}
+
 async function playIndex(index) {
   if (!tracks[index]) return;
   touch('controls');
@@ -692,7 +839,7 @@ async function playIndex(index) {
   const track = tracks[index];
 
   audio.src = track.audioUrl;
-  background.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
+  setAmbientFromTrack(track);
   cover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   coreCover.style.backgroundImage = track.backgroundUrl ? `url("${track.backgroundUrl}")` : '';
   syncTrackText();
@@ -1260,7 +1407,10 @@ function triggerStarFountain(power = 1, reason = 'kiai') {
 
 function updateStarFountains(now, elapsed) {
   const { width, height } = readStageSize();
-  const originOffset = Math.min(260, Math.max(120, width * 0.16));
+  const isPortrait = height > width * 1.18;
+  const originOffset = isPortrait
+    ? Math.max(54, width * 0.24)
+    : Math.min(260, Math.max(120, width * 0.16));
   const dt = elapsed / 1000;
   let spawnsThisFrame = 0;
 
@@ -1277,9 +1427,11 @@ function updateStarFountains(now, elapsed) {
         const progress = Math.max(0, Math.min(1, age / (burst.end - burst.start)));
         const x = side < 0 ? originOffset : width - originOffset;
         const y = height + 18;
-        const fan = burst.direction * side * 360 * (1 - progress * 1.8);
-        const vx = fan + (Math.random() - 0.5) * 150;
-        const vy = -1020 - Math.random() * 460 - burst.power * 260;
+        const fan = isPortrait
+          ? -side * (130 + Math.random() * 150) + burst.direction * side * 95 * (1 - progress)
+          : burst.direction * side * 360 * (1 - progress * 1.8);
+        const vx = fan + (Math.random() - 0.5) * (isPortrait ? 90 : 150);
+        const vy = (isPortrait ? -880 : -1020) - Math.random() * (isPortrait ? 360 : 460) - burst.power * (isPortrait ? 210 : 260);
         starParticles.push({
           x,
           y,
@@ -1502,6 +1654,7 @@ function draw() {
   setCssVar('--ghost-intensity', Math.max(0, settings.ghostIntensity || 0).toFixed(3));
   setCssVar('--ghost-blur', Math.max(0, settings.ghostBlur || 0).toFixed(3));
   const visualLight = Math.max(lightEnergy, sectionHeat * 0.12);
+  setCssVar('--ambient-energy', Math.min(1, Math.max(energy, visualLight * 0.38)).toFixed(3));
   setCssVar('--light', Math.min(1.25, visualLight).toFixed(2));
   setCssVar('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(2));
   setCssVar('--right', Math.min(1.2, rightEnergy + rightFlash * 0.42 + visualLight * 0.18).toFixed(2));
