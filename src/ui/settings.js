@@ -2,6 +2,7 @@ import { clamp, normaliseHexColour } from '../utils/format.js';
 
 export const defaultSettings = {
   language: 'auto',
+  performanceMode: 'auto',
   sideIntensity: 1,
   sideRestraint: 1,
   pulse: 1.6,

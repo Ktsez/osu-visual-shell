@@ -143,6 +143,32 @@ button:hover,
   opacity: calc(0.16 + var(--ambient-energy) * 0.13);
 }
 
+:root[data-performance="balanced"] #background::before {
+  filter: blur(34px) saturate(1.35) contrast(1.04);
+}
+
+:root[data-performance="balanced"] #background::after {
+  filter: blur(18px);
+}
+
+:root[data-performance="performance"] #background::before {
+  animation: none;
+  filter: blur(20px) saturate(1.16);
+  opacity: calc(0.08 + var(--ambient-energy) * 0.08);
+}
+
+:root[data-performance="performance"] #background::after {
+  animation: none;
+  filter: blur(10px);
+  opacity: calc(0.38 + var(--ambient-energy) * 0.1);
+}
+
+:root[data-performance="performance"] .top-bar,
+:root[data-performance="performance"] .control-panel,
+:root[data-performance="performance"] .float-panel {
+  backdrop-filter: none;
+}
+
 #shade {
   z-index: 1;
   pointer-events: none;

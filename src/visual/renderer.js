@@ -36,6 +36,7 @@ const settingsColorInputs = Object.fromEntries([...document.querySelectorAll('[d
 const settingsColorValues = Object.fromEntries([...document.querySelectorAll('[data-setting-color-value]')].map((item) => [item.dataset.settingColorValue, item]));
 const resetSettingsButton = document.querySelector('#reset-settings');
 const languageSelect = document.querySelector('#language-select');
+const performanceModeSelect = document.querySelector('#performance-mode');
 const topTitle = document.querySelector('#top-title');
 const topMeta = document.querySelector('#top-meta');
 const topPlayButton = document.querySelector('#top-play');
@@ -113,6 +114,8 @@ let coreGhostScale = 1;
 let lastVisualizerUpdate = 0;
 let visualizerOffset = 0;
 let visualizerPrimed = false;
+let adaptiveQuality = 0;
+let frameAverageMs = 16.7;
 let lastAudioFountainAt = -10000;
 let ambientToken = 0;
 let sideMode = 'idle';
@@ -122,10 +125,10 @@ const textCache = new WeakMap();
 
 const visualizerBars = new Float32Array(200);
 const previousVisualizerBins = new Float32Array(200);
-const maxStarParticles = 220;
-const maxStarSpawnsPerFrame = 18;
 const starPath = createStarPath();
 const hollowStarPath = createStarPath(0.58);
+const starSpriteCache = new Map();
+const starGlowSpriteCache = new Map();
 const settings = { ...defaultSettings };
 let activeLanguage = 'zh';
 let statusState = { key: 'readyStatus', values: {} };
@@ -174,6 +177,11 @@ const i18n = {
     visualSettings: '视觉设置',
     language: '语言',
     languageAuto: '自动',
+    performanceMode: '性能模式',
+    performanceAuto: '自动',
+    performanceQuality: '质量',
+    performanceBalanced: '平衡',
+    performancePerformance: '性能',
     sideIntensity: '侧灯强度',
     sideRestraint: '侧灯克制',
     pulse: '圆盘律动',
@@ -256,6 +264,11 @@ const i18n = {
     visualSettings: 'Visual Settings',
     language: 'Language',
     languageAuto: 'Auto',
+    performanceMode: 'Performance Mode',
+    performanceAuto: 'Auto',
+    performanceQuality: 'Quality',
+    performanceBalanced: 'Balanced',
+    performancePerformance: 'Performance',
     sideIntensity: 'Side light intensity',
     sideRestraint: 'Side light restraint',
     pulse: 'Core pulse',
@@ -405,9 +418,67 @@ function normaliseLanguageChoice(value) {
   return value === 'zh' || value === 'en' || value === 'auto' ? value : 'auto';
 }
 
+function normalisePerformanceMode(value) {
+  return ['auto', 'quality', 'balanced', 'performance'].includes(value) ? value : 'auto';
+}
+
 function resolveLanguage() {
   const choice = normaliseLanguageChoice(settings.language);
   return choice === 'auto' ? browserLanguage() : choice;
+}
+
+function performanceProfile() {
+  const requested = normalisePerformanceMode(settings.performanceMode);
+  const autoStep = requested === 'auto' ? adaptiveQuality : 0;
+  const mode = requested === 'auto'
+    ? (autoStep >= 2 ? 'performance' : autoStep >= 1 ? 'balanced' : 'quality')
+    : requested;
+  const profiles = {
+    quality: {
+      mode,
+      maxDpr: 1.6,
+      visualizerRounds: 5,
+      visualizerStep: 1,
+      drawPaleBars: true,
+      starMax: 180,
+      starSpawns: 14,
+      starGlowEvery: 1,
+      particleMax: 260,
+    },
+    balanced: {
+      mode,
+      maxDpr: 1.25,
+      visualizerRounds: 4,
+      visualizerStep: 1,
+      drawPaleBars: true,
+      starMax: 120,
+      starSpawns: 10,
+      starGlowEvery: 2,
+      particleMax: 190,
+    },
+    performance: {
+      mode,
+      maxDpr: 1,
+      visualizerRounds: 3,
+      visualizerStep: 2,
+      drawPaleBars: false,
+      starMax: 80,
+      starSpawns: 7,
+      starGlowEvery: 3,
+      particleMax: 140,
+    },
+  };
+  return profiles[mode] || profiles.balanced;
+}
+
+function updateAdaptiveQuality(elapsed) {
+  frameAverageMs = frameAverageMs * 0.94 + elapsed * 0.06;
+  if (settings.performanceMode !== 'auto') {
+    adaptiveQuality = 0;
+    return;
+  }
+  if (frameAverageMs > 24) adaptiveQuality = Math.min(2, adaptiveQuality + 0.035);
+  else if (frameAverageMs < 17.4) adaptiveQuality = Math.max(0, adaptiveQuality - 0.01);
 }
 
 function text(key, values = {}) {
@@ -457,6 +528,7 @@ function applyLanguage() {
     node.setAttribute('aria-label', text(node.dataset.i18nAria));
   });
   if (languageSelect) languageSelect.value = normaliseLanguageChoice(settings.language);
+  if (performanceModeSelect) performanceModeSelect.value = normalisePerformanceMode(settings.performanceMode);
   syncTransportLabels();
   syncTrackText();
   setStatus(text(statusState.key, statusState.values));
@@ -475,6 +547,7 @@ function loadSettings() {
     // Keep defaults when local storage contains invalid data.
   }
   settings.language = normaliseLanguageChoice(settings.language);
+  settings.performanceMode = normalisePerformanceMode(settings.performanceMode);
 
   for (const [key, input] of Object.entries(settingsInputs)) {
     if (!input) continue;
@@ -499,6 +572,14 @@ function loadSettings() {
     settings.language = normaliseLanguageChoice(languageSelect.value);
     localStorage.setItem(settingsKey, JSON.stringify(settings));
     applyLanguage();
+    touch('settings');
+  });
+
+  performanceModeSelect?.addEventListener('change', () => {
+    settings.performanceMode = normalisePerformanceMode(performanceModeSelect.value);
+    adaptiveQuality = 0;
+    localStorage.setItem(settingsKey, JSON.stringify(settings));
+    scheduleLayoutSync();
     touch('settings');
   });
 
@@ -552,7 +633,8 @@ function readStageSize() {
 
 function syncCanvasSize() {
   const { width, height } = readStageSize();
-  const ratio = Math.max(1, window.devicePixelRatio || 1);
+  const profile = performanceProfile();
+  const ratio = Math.max(1, Math.min(profile.maxDpr, window.devicePixelRatio || 1));
   const backingWidth = Math.max(1, Math.round(width * ratio));
   const backingHeight = Math.max(1, Math.round(height * ratio));
   if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
@@ -562,6 +644,7 @@ function syncCanvasSize() {
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   setCssVar('--viewport-width', `${width.toFixed(2)}px`);
   setCssVar('--viewport-height', `${height.toFixed(2)}px`);
+  document.documentElement.dataset.performance = profile.mode;
   return { width, height, ratio };
 }
 
@@ -1500,6 +1583,7 @@ function triggerStarFountain(power = 1, reason = 'kiai') {
 }
 
 function updateStarFountains(now, elapsed) {
+  const profile = performanceProfile();
   const { width, height } = readStageSize();
   const isPortrait = height > width * 1.18;
   const originOffset = isPortrait
@@ -1511,12 +1595,12 @@ function updateStarFountains(now, elapsed) {
   for (const burst of fountainBursts) {
     if (now > burst.end) continue;
 
-    const pressure = starParticles.length / maxStarParticles;
+    const pressure = starParticles.length / profile.starMax;
     const spawnEvery = 1000 / Math.max(56, (78 + burst.power * 58) * (1 - pressure * 0.42));
-    while (now - burst.lastSpawn >= spawnEvery && spawnsThisFrame < maxStarSpawnsPerFrame && starParticles.length < maxStarParticles) {
+    while (now - burst.lastSpawn >= spawnEvery && spawnsThisFrame < profile.starSpawns && starParticles.length < profile.starMax) {
       burst.lastSpawn += spawnEvery;
       for (const side of [-1, 1]) {
-        if (spawnsThisFrame >= maxStarSpawnsPerFrame || starParticles.length >= maxStarParticles) break;
+        if (spawnsThisFrame >= profile.starSpawns || starParticles.length >= profile.starMax) break;
         const age = burst.lastSpawn - burst.start;
         const progress = Math.max(0, Math.min(1, age / (burst.end - burst.start)));
         const x = side < 0 ? originOffset : width - originOffset;
@@ -1545,6 +1629,7 @@ function updateStarFountains(now, elapsed) {
   }
 
   fountainBursts = fountainBursts.filter((burst) => now <= burst.end);
+  if (starParticles.length > profile.starMax) starParticles.length = profile.starMax;
   let writeIndex = 0;
   for (let i = 0; i < starParticles.length; i += 1) {
     const particle = starParticles[i];
@@ -1562,31 +1647,68 @@ function updateStarFountains(now, elapsed) {
 }
 
 function drawStar(ctx, x, y, radius, rotation, alpha, hollow = false) {
+  const sprite = starSprite(hollow, radius);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
-  ctx.scale(radius, radius);
   ctx.globalAlpha = alpha;
-  if (hollow) {
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 0.18;
-    ctx.lineJoin = 'round';
-    ctx.stroke(hollowStarPath);
-  } else {
-    ctx.fillStyle = '#fff';
-    ctx.fill(starPath);
-  }
+  ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
   ctx.restore();
 }
 
+function makeSpriteCanvas(size) {
+  const canvasNode = document.createElement('canvas');
+  canvasNode.width = size;
+  canvasNode.height = size;
+  return canvasNode;
+}
+
+function starSprite(hollow, radius) {
+  const bucket = Math.max(8, Math.min(28, Math.round(radius)));
+  const key = `${hollow ? 'h' : 'f'}:${bucket}`;
+  if (starSpriteCache.has(key)) return starSpriteCache.get(key);
+  const padding = 4;
+  const size = (bucket + padding) * 2;
+  const sprite = makeSpriteCanvas(size);
+  const spriteCtx = sprite.getContext('2d');
+  spriteCtx.translate(size / 2, size / 2);
+  spriteCtx.scale(bucket, bucket);
+  if (hollow) {
+    spriteCtx.strokeStyle = '#fff';
+    spriteCtx.lineWidth = 0.18;
+    spriteCtx.lineJoin = 'round';
+    spriteCtx.stroke(hollowStarPath);
+  } else {
+    spriteCtx.fillStyle = '#fff';
+    spriteCtx.fill(starPath);
+  }
+  starSpriteCache.set(key, sprite);
+  return sprite;
+}
+
 function drawStarGlow(ctx, x, y, radius, alpha) {
+  const sprite = starGlowSprite(radius);
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.drawImage(sprite, x - sprite.width / 2, y - sprite.height / 2);
   ctx.restore();
+}
+
+function starGlowSprite(radius) {
+  const bucket = Math.max(12, Math.min(56, Math.round(radius / 4) * 4));
+  const key = String(bucket);
+  if (starGlowSpriteCache.has(key)) return starGlowSpriteCache.get(key);
+  const size = bucket * 2;
+  const sprite = makeSpriteCanvas(size);
+  const spriteCtx = sprite.getContext('2d');
+  const gradient = spriteCtx.createRadialGradient(bucket, bucket, 0, bucket, bucket, bucket);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+  gradient.addColorStop(0.42, 'rgba(255, 255, 255, 0.34)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  spriteCtx.fillStyle = gradient;
+  spriteCtx.fillRect(0, 0, size, size);
+  starGlowSpriteCache.set(key, sprite);
+  return sprite;
 }
 
 function drawRippleRings(cx, cy, coreSize, now, stageWidth, stageHeight) {
@@ -1638,6 +1760,8 @@ function draw() {
   const now = performance.now();
   const elapsed = Math.min(80, now - lastFrameAt);
   lastFrameAt = now;
+  updateAdaptiveQuality(elapsed);
+  const profile = performanceProfile();
 
   updateAudioEnergy();
   updateLogoAmplitudes(now, elapsed);
@@ -1716,6 +1840,9 @@ function draw() {
     scytheEventCount: scytheEvents.length,
     starParticles: starParticles.length,
     fountainBursts: fountainBursts.length,
+    frameAverageMs,
+    performanceMode: profile.mode,
+    adaptiveQuality,
     stageSize: [width, height],
     visualCenter: [coreMetrics.cx, coreMetrics.cy],
     coreSize,
@@ -1775,17 +1902,20 @@ function draw() {
     ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
     ctx.fill();
   }
-  particles = particles.filter((particle) => particle.life > 0.04);
+  particles = particles.filter((particle) => particle.life > 0.04).slice(-profile.particleMax);
 
   const starGlow = Math.max(0, settings.starGlow || 0);
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const particle of starParticles) {
-    const progress = particle.age / particle.duration;
-    const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
-    drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
+  if (starGlow > 0.01) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < starParticles.length; i += profile.starGlowEvery) {
+      const particle = starParticles[i];
+      const progress = particle.age / particle.duration;
+      const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
+      drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   for (const particle of starParticles) {
     const progress = particle.age / particle.duration;
@@ -1798,8 +1928,9 @@ function draw() {
 }
 
 function drawLogoVisualizer(cx, cy, coreSize) {
+  const profile = performanceProfile();
   const bars = visualizerBars.length;
-  const visualiserRounds = 5;
+  const visualiserRounds = profile.visualizerRounds;
   const baseRadius = coreSize * 0.472;
   const maxBarLength = coreSize * 0.58 * Math.max(0.05, settings.visualizerRange);
   const barWidth = Math.max(5.2, (Math.PI * 2 * coreSize * 0.5) / bars * 0.86);
@@ -1821,7 +1952,7 @@ function drawLogoVisualizer(cx, cy, coreSize) {
 
   for (let round = 0; round < visualiserRounds; round += 1) {
     const roundOffset = (round * Math.PI * 2) / visualiserRounds;
-    for (let i = 0; i < bars; i += 1) {
+    for (let i = 0; i < bars; i += profile.visualizerStep) {
       const amplitude = visualizerBars[i];
       if (amplitude <= deadZone) continue;
       const angle = (i / bars) * Math.PI * 2 + roundOffset;
@@ -1834,7 +1965,7 @@ function drawLogoVisualizer(cx, cy, coreSize) {
       ctx.fillStyle = `rgba(255, 255, 255, ${darkAlpha})`;
       drawRoundedBar(angle, baseRadius, length, darkWidth, darkWidth * 0.5, () => ctx.fill());
 
-      if (length > coreSize * 0.022) {
+      if (profile.drawPaleBars && length > coreSize * 0.022) {
         ctx.strokeStyle = `rgba(255, 255, 255, ${paleAlpha})`;
         ctx.lineWidth = Math.max(1.2, paleWidth * 0.18);
         drawRoundedBar(angle, baseRadius + darkWidth * 0.06, length * 0.94, paleWidth, paleWidth * 0.5, () => ctx.stroke());
