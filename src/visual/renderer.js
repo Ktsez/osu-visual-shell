@@ -116,6 +116,7 @@ let visualizerOffset = 0;
 let visualizerPrimed = false;
 let adaptiveQuality = 0;
 let frameAverageMs = 16.7;
+let drawVisualizerAvgMs = 0;
 let lastAudioFountainAt = -10000;
 let ambientToken = 0;
 let sideMode = 'idle';
@@ -1841,6 +1842,7 @@ function draw() {
     starParticles: starParticles.length,
     fountainBursts: fountainBursts.length,
     frameAverageMs,
+    drawVisualizerAvgMs,
     performanceMode: profile.mode,
     adaptiveQuality,
     stageSize: [width, height],
@@ -1928,6 +1930,7 @@ function draw() {
 }
 
 function drawLogoVisualizer(cx, cy, coreSize) {
+  performance.mark('dlv-start');
   const profile = performanceProfile();
   const bars = visualizerBars.length;
   const visualiserRounds = profile.visualizerRounds;
@@ -1998,6 +2001,13 @@ function drawLogoVisualizer(cx, cy, coreSize) {
   }
 
   ctx.restore();
+  performance.mark('dlv-end');
+  performance.measure('drawLogoVisualizer', 'dlv-start', 'dlv-end');
+  const dlvMs = performance.getEntriesByName('drawLogoVisualizer').at(-1)?.duration ?? 0;
+  drawVisualizerAvgMs = drawVisualizerAvgMs * 0.95 + dlvMs * 0.05;
+  performance.clearMeasures('drawLogoVisualizer');
+  performance.clearMarks('dlv-start');
+  performance.clearMarks('dlv-end');
 }
 
 window.addEventListener('resize', scheduleLayoutSync);
