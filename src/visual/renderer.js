@@ -134,6 +134,8 @@ const starPath = createStarPath();
 const hollowStarPath = createStarPath(0.58);
 const starSpriteCache = new Map();
 const starGlowSpriteCache = new Map();
+const rgbaWhite = Array.from({ length: 256 }, (_, i) => `rgba(255,255,255,${(i / 255).toFixed(3)})`);
+const rgbaPink  = Array.from({ length: 256 }, (_, i) => `rgba(255,232,250,${(i / 255).toFixed(3)})`);
 const settings = { ...defaultSettings };
 let activeLanguage = 'zh';
 let statusState = { key: 'readyStatus', values: {} };
@@ -1920,7 +1922,7 @@ function draw() {
     particle.vy *= 0.986;
     particle.life *= 0.962;
     if (particle.life > 0.04) {
-      ctx.fillStyle = `rgba(255, 232, 250, ${particle.life * 0.88})`;
+      ctx.fillStyle = rgbaPink[Math.round(particle.life * 0.88 * 255)];
       ctx.beginPath();
       ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
       ctx.fill();
@@ -1991,7 +1993,7 @@ function drawLogoVisualizer(cx, cy, coreSize) {
       const y1 = (baseRadius + length) * sin;
 
       const darkAlpha = Math.min(0.28, 0.05 + amplitude * 0.62);
-      ctx.fillStyle = `rgba(255, 255, 255, ${darkAlpha})`;
+      ctx.fillStyle = rgbaWhite[Math.round(darkAlpha * 255)];
       ctx.beginPath();
       ctx.moveTo(x0 + hws, y0 - hwc);
       ctx.lineTo(x1 + hws, y1 - hwc);
@@ -2010,7 +2012,7 @@ function drawLogoVisualizer(cx, cy, coreSize) {
         const px1 = (paleBaseRadius + paleLength) * cos;
         const py1 = (paleBaseRadius + paleLength) * sin;
 
-        ctx.strokeStyle = `rgba(255, 255, 255, ${paleAlpha})`;
+        ctx.strokeStyle = rgbaWhite[Math.round(paleAlpha * 255)];
         ctx.lineWidth = paleStrokeWidth;
         ctx.beginPath();
         ctx.moveTo(px0 + phws, py0 - phwc);
