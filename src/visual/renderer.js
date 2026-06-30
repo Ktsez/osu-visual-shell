@@ -117,6 +117,10 @@ let visualizerPrimed = false;
 let adaptiveQuality = 0;
 let frameAverageMs = 16.7;
 let drawVisualizerAvgMs = 0;
+let cachedStageWidth = 0;
+let cachedStageHeight = 0;
+let cachedRatio = 1;
+let cachedCoreMetrics = { cx: 0, cy: 0, size: 300 };
 let lastAudioFountainAt = -10000;
 let ambientToken = 0;
 let sideMode = 'idle';
@@ -660,7 +664,11 @@ function coreVisualMetrics(stageWidth, stageHeight) {
 }
 
 function resize() {
-  syncCanvasSize();
+  const result = syncCanvasSize();
+  cachedStageWidth = result.width;
+  cachedStageHeight = result.height;
+  cachedRatio = result.ratio;
+  cachedCoreMetrics = coreVisualMetrics(result.width, result.height);
 }
 
 function scheduleLayoutSync() {
@@ -1796,13 +1804,15 @@ function draw() {
     document.body.classList.add('is-idle');
   }
 
-  const { width, height } = syncCanvasSize();
+  ctx.setTransform(cachedRatio, 0, 0, cachedRatio, 0, 0);
+  const width = cachedStageWidth;
+  const height = cachedStageHeight;
   ctx.clearRect(0, 0, width, height);
 
   const beatMotion = !audio.paused ? continuousBeat * 0.015 : 0;
   const energy = Math.max(smoothedEnergy * 1.08, logoPulse * 0.34, coreBreath * 0.92, beatMotion);
   const earlyDip = timingPulse > 0.5 ? -0.005 * Math.min(1, timingPulse) : 0;
-  const coreMetrics = coreVisualMetrics(width, height);
+  const coreMetrics = cachedCoreMetrics;
   const coreSize = coreMetrics.size;
   const targetFollowX = coreHover ? Math.max(-9, Math.min(9, (pointerX - width / 2) * 0.045)) : 0;
   const targetFollowY = coreHover ? Math.max(-9, Math.min(9, (pointerY - height / 2) * 0.045)) : 0;
