@@ -1637,7 +1637,11 @@ function updateStarFountains(now, elapsed) {
     }
   }
 
-  fountainBursts = fountainBursts.filter((burst) => now <= burst.end);
+  let fbWrite = 0;
+  for (let i = 0; i < fountainBursts.length; i += 1) {
+    if (now <= fountainBursts[i].end) fountainBursts[fbWrite++] = fountainBursts[i];
+  }
+  fountainBursts.length = fbWrite;
   if (starParticles.length > profile.starMax) starParticles.length = profile.starMax;
   let writeIndex = 0;
   for (let i = 0; i < starParticles.length; i += 1) {
@@ -1724,7 +1728,9 @@ function drawRippleRings(cx, cy, coreSize, now, stageWidth, stageHeight) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.globalCompositeOperation = 'lighter';
-  for (const ring of rippleRings) {
+  let rrWrite = 0;
+  for (let i = 0; i < rippleRings.length; i += 1) {
+    const ring = rippleRings[i];
     const progress = Math.max(0, Math.min(1, (now - ring.start) / ring.duration));
     const eased = 1 - Math.pow(1 - progress, 2.05);
     const maxRadius = Math.min(stageWidth, stageHeight) * 0.67 * Math.max(0.05, settings.waveSize);
@@ -1741,9 +1747,10 @@ function drawRippleRings(cx, cy, coreSize, now, stageWidth, stageHeight) {
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fill();
+    if (now - ring.start < ring.duration) rippleRings[rrWrite++] = ring;
   }
   ctx.restore();
-  rippleRings = rippleRings.filter((ring) => now - ring.start < ring.duration);
+  rippleRings.length = rrWrite;
 }
 
 function formatTime(seconds) {
@@ -1903,18 +1910,24 @@ function draw() {
   drawRippleRings(coreMetrics.cx, coreMetrics.cy, coreSize, now, width, height);
   drawLogoVisualizer(coreMetrics.cx, coreMetrics.cy, coreSize);
 
-  for (const particle of particles) {
+  const pStart = particles.length > profile.particleMax ? particles.length - profile.particleMax : 0;
+  let pWrite = 0;
+  for (let i = pStart; i < particles.length; i += 1) {
+    const particle = particles[i];
     particle.x += particle.vx;
     particle.y += particle.vy;
     particle.vx *= 0.986;
     particle.vy *= 0.986;
     particle.life *= 0.962;
-    ctx.fillStyle = `rgba(255, 232, 250, ${particle.life * 0.88})`;
-    ctx.beginPath();
-    ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
-    ctx.fill();
+    if (particle.life > 0.04) {
+      ctx.fillStyle = `rgba(255, 232, 250, ${particle.life * 0.88})`;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
+      ctx.fill();
+      particles[pWrite++] = particle;
+    }
   }
-  particles = particles.filter((particle) => particle.life > 0.04).slice(-profile.particleMax);
+  particles.length = pWrite;
 
   const starGlow = Math.max(0, settings.starGlow || 0);
   if (starGlow > 0.01) {
