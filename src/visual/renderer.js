@@ -1,6 +1,8 @@
 import { defaultSettings, settingsKey } from '../ui/settings.js';
 
 export function startVisualShell() {
+if (window.__osuVisualShellStarted) return;
+window.__osuVisualShellStarted = true;
 const app = document.querySelector('#app');
 window.__appVersion = '20260613-screenshot-defaults';
 const canvas = document.querySelector('#stage');
@@ -40,6 +42,124 @@ const performanceModeSelect = document.querySelector('#performance-mode');
 const topTitle = document.querySelector('#top-title');
 const topMeta = document.querySelector('#top-meta');
 const topPlayButton = document.querySelector('#top-play');
+const i18nTextNodes = [...document.querySelectorAll('[data-i18n]')];
+const i18nPlaceholderNodes = [...document.querySelectorAll('[data-i18n-placeholder]')];
+const i18nAriaNodes = [...document.querySelectorAll('[data-i18n-aria]')];
+const openScanButton = document.querySelector('#open-scan');
+const openLibraryButton = document.querySelector('#open-library');
+const openSettingsButton = document.querySelector('#open-settings');
+const topScanButton = document.querySelector('#top-scan');
+const topLibraryButton = document.querySelector('#top-library');
+const topSettingsButton = document.querySelector('#top-settings');
+const closeScanButton = document.querySelector('#close-scan');
+const closeLibraryButton = document.querySelector('#close-library');
+const closeSettingsButton = document.querySelector('#close-settings');
+const detectOsuButton = document.querySelector('#detect-osu');
+const scanOsuButton = document.querySelector('#scan-osu');
+const scanLazerButton = document.querySelector('#scan-lazer');
+const scanMusicButton = document.querySelector('#scan-music');
+const prevButton = document.querySelector('#prev');
+const nextButton = document.querySelector('#next');
+const topPrevButton = document.querySelector('#top-prev');
+const topNextButton = document.querySelector('#top-next');
+const transportButtonsById = new Map([
+  ['toggle-play', playButton],
+  ['prev', prevButton],
+  ['next', nextButton],
+  ['top-play', topPlayButton],
+  ['top-prev', topPrevButton],
+  ['top-next', topNextButton],
+]);
+const debugParams = new URLSearchParams(window.location.search);
+const debugPerfEnabled = debugParams.get('debugPerf') === '1';
+const fpsOnlyEnabled = debugParams.get('fpsOnly') === '1';
+const perfLogEnabled = debugParams.get('perfLog') === '1';
+const perfStatsEnabled = debugPerfEnabled || fpsOnlyEnabled || perfLogEnabled;
+const renderStageStatsEnabled = debugPerfEnabled || perfLogEnabled;
+const forceCompositeSafeParam = debugParams.get('forceCompositeSafe');
+const isMacLike = /Mac|iPhone|iPad|iPod/.test(navigator.platform || '') || /Mac OS X|iPhone|iPad|iPod/.test(navigator.userAgent || '');
+const isRetinaLike = (window.devicePixelRatio || 1) >= 1.5;
+const autoCompositeSafeMode = isMacLike && isRetinaLike;
+const compositeSafeMode = forceCompositeSafeParam === '1'
+  ? true
+  : forceCompositeSafeParam === '0'
+    ? false
+    : autoCompositeSafeMode;
+const compositeSafeReason = forceCompositeSafeParam === '1'
+  ? 'forced-on'
+  : forceCompositeSafeParam === '0'
+    ? 'forced-off'
+    : autoCompositeSafeMode
+      ? 'auto-mac'
+      : 'disabled';
+const debugNoCssFx = debugPerfEnabled && debugParams.get('noCssFx') === '1';
+const effectiveCssSafe = compositeSafeMode || debugNoCssFx;
+const safeCssSource = compositeSafeMode && debugNoCssFx
+  ? 'both'
+  : compositeSafeMode
+    ? 'compositeSafe'
+    : debugNoCssFx
+      ? 'noCssFx'
+      : 'none';
+const debugNoBackdropFx = effectiveCssSafe || (debugPerfEnabled && debugParams.get('noBackdropFx') === '1');
+const debugNoBlurFx = effectiveCssSafe || (debugPerfEnabled && debugParams.get('noBlurFx') === '1');
+const debugNoBlendFx = effectiveCssSafe || (debugPerfEnabled && debugParams.get('noBlendFx') === '1');
+const debugNoShadowFx = effectiveCssSafe || (debugPerfEnabled && debugParams.get('noShadowFx') === '1');
+const debugNoSideLightFx = effectiveCssSafe || (debugPerfEnabled && debugParams.get('noSideLightFx') === '1');
+const debugNoBgCssFx = effectiveCssSafe || (debugPerfEnabled && debugParams.get('noBgCssFx') === '1');
+const debugNoPanelBackdropFx = effectiveCssSafe || (debugPerfEnabled && debugParams.get('noPanelBackdropFx') === '1');
+const debugNoAllBgFx = debugPerfEnabled && debugParams.get('noAllBgFx') === '1';
+const debugNoAllPanelFx = debugPerfEnabled && debugParams.get('noAllPanelFx') === '1';
+const debugNoAllLightFx = debugPerfEnabled && debugParams.get('noAllLightFx') === '1';
+const debugNoAllAnimationFx = debugPerfEnabled && debugParams.get('noAllAnimationFx') === '1';
+const debugNoAllFixedFx = debugPerfEnabled && debugParams.get('noAllFixedFx') === '1';
+const debugNoCssFxButKeepBg = debugPerfEnabled && debugParams.get('noCssFxButKeepBg') === '1';
+const debugNoCssFxOnlyBg = debugPerfEnabled && debugParams.get('noCssFxOnlyBg') === '1';
+const debugFreezeBg = debugPerfEnabled && debugParams.get('freezeBg') === '1';
+const debugNoBgImage = debugPerfEnabled && debugParams.get('noBgImage') === '1';
+const debugNoBgPseudo = debugPerfEnabled && debugParams.get('noBgPseudo') === '1';
+const debugNoBgAnimation = debugPerfEnabled && debugParams.get('noBgAnimation') === '1';
+const debugNoBgBlendOnly = debugPerfEnabled && debugParams.get('noBgBlendOnly') === '1';
+const debugNoBgFilterOnly = debugPerfEnabled && debugParams.get('noBgFilterOnly') === '1';
+const debugNoBgTransformOnly = debugPerfEnabled && debugParams.get('noBgTransformOnly') === '1';
+const debugNoBgOpacityOnly = debugPerfEnabled && debugParams.get('noBgOpacityOnly') === '1';
+const debugNoBgCacheRebuild = debugPerfEnabled && debugParams.get('noBgCacheRebuild') === '1';
+const debugShowResize = debugPerfEnabled && debugParams.get('showResize') === '1';
+const debugSolidCanvasBg = debugPerfEnabled && debugParams.get('solidCanvasBg') === '1';
+const debugNoCanvasClear = debugParams.get('noCanvasClear') === '1';
+const debugNoSpectrumDraw = debugParams.get('noSpectrumDraw') === '1';
+const debugNoCoreDraw = debugParams.get('noCoreDraw') === '1';
+const debugNoRippleDraw = debugParams.get('noRippleDraw') === '1';
+const debugNoStarDraw = debugParams.get('noStarDraw') === '1';
+const debugNoCanvasBgDraw = debugParams.get('noCanvasBgDraw') === '1';
+const debugNoGlowDraw = debugParams.get('noGlowDraw') === '1';
+const dprTestValue = debugParams.has('dprTest') ? Number(debugParams.get('dprTest')) : 0;
+document.documentElement.dataset.compositeSafeMode = compositeSafeMode ? 'on' : 'off';
+document.documentElement.dataset.debugCssFx = effectiveCssSafe ? 'off' : 'on';
+document.documentElement.dataset.debugBackdropFx = debugNoBackdropFx ? 'off' : 'on';
+document.documentElement.dataset.debugBlurFx = debugNoBlurFx ? 'off' : 'on';
+document.documentElement.dataset.debugBlendFx = debugNoBlendFx ? 'off' : 'on';
+document.documentElement.dataset.debugShadowFx = debugNoShadowFx ? 'off' : 'on';
+document.documentElement.dataset.debugSideLightFx = debugNoSideLightFx ? 'off' : 'on';
+document.documentElement.dataset.debugBgCssFx = debugNoBgCssFx ? 'off' : 'on';
+document.documentElement.dataset.debugPanelBackdropFx = debugNoPanelBackdropFx ? 'off' : 'on';
+document.documentElement.dataset.debugAllBgFx = debugNoAllBgFx ? 'off' : 'on';
+document.documentElement.dataset.debugAllPanelFx = debugNoAllPanelFx ? 'off' : 'on';
+document.documentElement.dataset.debugAllLightFx = debugNoAllLightFx ? 'off' : 'on';
+document.documentElement.dataset.debugAllAnimationFx = debugNoAllAnimationFx ? 'off' : 'on';
+document.documentElement.dataset.debugAllFixedFx = debugNoAllFixedFx ? 'off' : 'on';
+document.documentElement.dataset.debugCssFxButKeepBg = debugNoCssFxButKeepBg ? 'on' : 'off';
+document.documentElement.dataset.debugCssFxOnlyBg = debugNoCssFxOnlyBg ? 'on' : 'off';
+document.documentElement.dataset.debugFreezeBg = debugFreezeBg ? 'on' : 'off';
+document.documentElement.dataset.debugNoBgImage = debugNoBgImage ? 'on' : 'off';
+document.documentElement.dataset.debugNoBgPseudo = debugNoBgPseudo ? 'on' : 'off';
+document.documentElement.dataset.debugNoBgAnimation = debugNoBgAnimation ? 'on' : 'off';
+document.documentElement.dataset.debugNoBgBlendOnly = debugNoBgBlendOnly ? 'on' : 'off';
+document.documentElement.dataset.debugNoBgFilterOnly = debugNoBgFilterOnly ? 'on' : 'off';
+document.documentElement.dataset.debugNoBgTransformOnly = debugNoBgTransformOnly ? 'on' : 'off';
+document.documentElement.dataset.debugNoBgOpacityOnly = debugNoBgOpacityOnly ? 'on' : 'off';
+document.documentElement.dataset.debugShowResize = debugShowResize ? 'on' : 'off';
+document.documentElement.dataset.debugSolidCanvasBg = debugSolidCanvasBg ? 'on' : 'off';
 
 let tracks = [];
 let visibleTracks = [];
@@ -121,12 +241,114 @@ let cachedStageWidth = 0;
 let cachedStageHeight = 0;
 let cachedRatio = 1;
 let cachedCoreMetrics = { cx: 0, cy: 0, size: 300 };
+let cachedDevicePixelRatio = window.devicePixelRatio || 1;
+let activeInheritedTimingPoints = [];
+let activeAllTimingPoints = [];
+let lastResizeAt = performance.now();
+let resizeFrameId = 0;
+let resizeTimerIds = [];
+let rafId = 0;
+let renderLoopRunning = false;
+let activeRenderLoopCount = 0;
+let frameCountForStats = 0;
+let frameTimeSum = 0;
+let latestFrameTimeMs = 0;
+let latestFps = 0;
+let lastPerfPanelUpdate = 0;
+let lastPerfLogAt = 0;
+let lastPerfPanelText = '';
+let lastVisualizerBarCount = 0;
+let lastVisualizerDrawBatchCount = 0;
+let lastCanvasStateChangeCount = 0;
+let lastParticleCount = 0;
+let layoutReadCount = 0;
+let cachedQualityProfile = null;
+let cachedCssStageWidth = 0;
+let cachedCssStageHeight = 0;
+let cachedBackingWidth = 0;
+let cachedBackingHeight = 0;
+let renderedDpr = 1;
+let resizeEventCount = 0;
+let backingRebuildCount = 0;
+let backgroundCacheRebuildCount = 0;
+let glowCacheRebuildCount = 0;
+let rippleCacheRebuildCount = 0;
+let starCacheRebuildCount = 0;
+let spectrumGeometryRebuildCount = 0;
+let otherCacheRebuildCount = 0;
+let lastCacheRebuildMs = 0;
+let cacheRebuildInProgress = false;
+let lastBackingSignature = '';
+let lastSizeSignature = '';
 let lastAudioFountainAt = -10000;
 let ambientToken = 0;
 let sideMode = 'idle';
 let sideModeUntil = 0;
 const cssVarCache = new Map();
 const textCache = new WeakMap();
+const particlePool = [];
+const starParticlePool = [];
+const rippleRingPool = [];
+const fountainBurstPool = [];
+const visualizerCandidateIndexes = new Int16Array(200);
+const visualizerCandidateTargets = new Float32Array(200);
+const visualizerCandidateScores = new Float32Array(200);
+const visualizerGeometryCache = {
+  key: '',
+  values: new Float32Array(0),
+};
+const visualizerBatchCache = {
+  capacity: 0,
+  darkCounts: new Uint16Array(256),
+  paleCounts: new Uint16Array(256),
+  darkOffsets: new Uint16Array(257),
+  paleOffsets: new Uint16Array(257),
+  darkCursors: new Uint16Array(256),
+  paleCursors: new Uint16Array(256),
+  darkItems: new Uint16Array(0),
+  paleItems: new Uint16Array(0),
+};
+let rippleUnitGradient = null;
+const resizeEvents = [];
+const backingRebuildEvents = [];
+const backingSignatureHistory = [];
+const frameStatsWindow = [];
+const renderStageNames = ['clear', 'background', 'core', 'spectrum', 'ripple', 'stars', 'finalComposite', 'debugStats'];
+const renderStageWindows = Object.fromEntries(renderStageNames.map((name) => [name, []]));
+const renderStageSummary = Object.fromEntries(renderStageNames.map((name) => [name, { avg: 0, p95: 0, count: 0 }]));
+const perfSummary = {
+  avgFps: 0,
+  minFps: 0,
+  maxFps: 0,
+  p95FrameMs: 0,
+  p99FrameMs: 0,
+  droppedFrames: 0,
+  longFrames: 0,
+  veryLongFrames: 0,
+  sampleCount: 0,
+};
+const cacheRebuildEvents = {
+  background: [],
+  glow: [],
+  ripple: [],
+  star: [],
+  spectrum: [],
+  other: [],
+};
+const DEBUG_PANEL_UPDATE_MS = 250;
+const FPS_ONLY_UPDATE_MS = 250;
+const VISUALIZER_ALPHA_BUCKET_STEP = 4;
+const qualityProfile = {
+  mode: 'quality',
+  maxDpr: 1.6,
+  visualizerRounds: 5,
+  visualizerStep: 1,
+  drawPaleBars: true,
+  starMax: 180,
+  starSpawns: 14,
+  starGlowEvery: 1,
+  particleMax: 260,
+};
 
 const visualizerBars = new Float32Array(200);
 const previousVisualizerBins = new Float32Array(200);
@@ -137,6 +359,7 @@ const starGlowSpriteCache = new Map();
 const rgbaWhite = Array.from({ length: 256 }, (_, i) => `rgba(255,255,255,${(i / 255).toFixed(3)})`);
 const rgbaPink  = Array.from({ length: 256 }, (_, i) => `rgba(255,232,250,${(i / 255).toFixed(3)})`);
 const settings = { ...defaultSettings };
+let glowColourCache = hexToRgb(settings.coreGlowColor);
 let activeLanguage = 'zh';
 let statusState = { key: 'readyStatus', values: {} };
 
@@ -399,6 +622,7 @@ function writeColourInput(key) {
 
 function persistColourSetting(key, value) {
   settings[key] = normaliseHexColour(value, defaultSettings[key]);
+  if (key === 'coreGlowColor') glowColourCache = hexToRgb(settings[key]);
   writeColourInput(key);
   localStorage.setItem(settingsKey, JSON.stringify(settings));
   touch('settings');
@@ -436,56 +660,15 @@ function resolveLanguage() {
 
 function performanceProfile() {
   const requested = normalisePerformanceMode(settings.performanceMode);
-  const autoStep = requested === 'auto' ? adaptiveQuality : 0;
-  const mode = requested === 'auto'
-    ? (autoStep >= 2 ? 'performance' : autoStep >= 1 ? 'balanced' : 'quality')
-    : requested;
-  const profiles = {
-    quality: {
-      mode,
-      maxDpr: 1.6,
-      visualizerRounds: 5,
-      visualizerStep: 1,
-      drawPaleBars: true,
-      starMax: 180,
-      starSpawns: 14,
-      starGlowEvery: 1,
-      particleMax: 260,
-    },
-    balanced: {
-      mode,
-      maxDpr: 1.25,
-      visualizerRounds: 4,
-      visualizerStep: 1,
-      drawPaleBars: true,
-      starMax: 120,
-      starSpawns: 10,
-      starGlowEvery: 2,
-      particleMax: 190,
-    },
-    performance: {
-      mode,
-      maxDpr: 1,
-      visualizerRounds: 3,
-      visualizerStep: 2,
-      drawPaleBars: false,
-      starMax: 80,
-      starSpawns: 7,
-      starGlowEvery: 3,
-      particleMax: 140,
-    },
-  };
-  return profiles[mode] || profiles.balanced;
+  if (!cachedQualityProfile || cachedQualityProfile.mode !== requested) {
+    cachedQualityProfile = { ...qualityProfile, mode: requested };
+  }
+  return cachedQualityProfile;
 }
 
 function updateAdaptiveQuality(elapsed) {
   frameAverageMs = frameAverageMs * 0.94 + elapsed * 0.06;
-  if (settings.performanceMode !== 'auto') {
-    adaptiveQuality = 0;
-    return;
-  }
-  if (frameAverageMs > 24) adaptiveQuality = Math.min(2, adaptiveQuality + 0.035);
-  else if (frameAverageMs < 17.4) adaptiveQuality = Math.max(0, adaptiveQuality - 0.01);
+  adaptiveQuality = 0;
 }
 
 function text(key, values = {}) {
@@ -527,11 +710,11 @@ function applyLanguage() {
   activeLanguage = resolveLanguage();
   document.documentElement.lang = activeLanguage === 'zh' ? 'zh-CN' : 'en';
   document.title = text('appTitle');
-  document.querySelectorAll('[data-i18n]').forEach((node) => setText(node, text(node.dataset.i18n)));
-  document.querySelectorAll('[data-i18n-placeholder]').forEach((node) => {
+  i18nTextNodes.forEach((node) => setText(node, text(node.dataset.i18n)));
+  i18nPlaceholderNodes.forEach((node) => {
     node.setAttribute('placeholder', text(node.dataset.i18nPlaceholder));
   });
-  document.querySelectorAll('[data-i18n-aria]').forEach((node) => {
+  i18nAriaNodes.forEach((node) => {
     node.setAttribute('aria-label', text(node.dataset.i18nAria));
   });
   if (languageSelect) languageSelect.value = normaliseLanguageChoice(settings.language);
@@ -555,6 +738,8 @@ function loadSettings() {
   }
   settings.language = normaliseLanguageChoice(settings.language);
   settings.performanceMode = normalisePerformanceMode(settings.performanceMode);
+  glowColourCache = hexToRgb(settings.coreGlowColor);
+  cachedQualityProfile = null;
 
   for (const [key, input] of Object.entries(settingsInputs)) {
     if (!input) continue;
@@ -585,6 +770,7 @@ function loadSettings() {
   performanceModeSelect?.addEventListener('change', () => {
     settings.performanceMode = normalisePerformanceMode(performanceModeSelect.value);
     adaptiveQuality = 0;
+    cachedQualityProfile = null;
     localStorage.setItem(settingsKey, JSON.stringify(settings));
     scheduleLayoutSync();
     touch('settings');
@@ -592,6 +778,8 @@ function loadSettings() {
 
   resetSettingsButton?.addEventListener('click', () => {
     Object.assign(settings, defaultSettings);
+    glowColourCache = hexToRgb(settings.coreGlowColor);
+    cachedQualityProfile = null;
     localStorage.setItem(settingsKey, JSON.stringify(settings));
     Object.keys(settingsInputs).forEach(writeSettingInputs);
     Object.keys(settingsColorInputs).forEach(writeColourInput);
@@ -628,34 +816,88 @@ function handleBlankDismiss(event) {
   return true;
 }
 
+function pruneRecentEvents(events, now, windowMs = 5000) {
+  while (events.length && now - events[0] > windowMs) events.shift();
+  return events.length;
+}
+
+function pushRecentEvent(events, now) {
+  events.push(now);
+  pruneRecentEvents(events, now);
+}
+
+function recordCacheRebuild(type, duration = 0) {
+  const now = performance.now();
+  if (type === 'background') backgroundCacheRebuildCount += 1;
+  else if (type === 'glow') glowCacheRebuildCount += 1;
+  else if (type === 'ripple') rippleCacheRebuildCount += 1;
+  else if (type === 'star') starCacheRebuildCount += 1;
+  else if (type === 'spectrum') spectrumGeometryRebuildCount += 1;
+  else otherCacheRebuildCount += 1;
+  pushRecentEvent(cacheRebuildEvents[type] || cacheRebuildEvents.other, now);
+  lastCacheRebuildMs = duration;
+}
+
+function totalCacheRebuilds() {
+  return backgroundCacheRebuildCount
+    + glowCacheRebuildCount
+    + rippleCacheRebuildCount
+    + starCacheRebuildCount
+    + spectrumGeometryRebuildCount
+    + otherCacheRebuildCount;
+}
+
+function roundedViewportValue(value) {
+  return Math.max(1, Math.round(Number(value) || 1));
+}
+
 function readStageSize() {
-  const rect = canvas.getBoundingClientRect();
-  const width = window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || rect.width;
-  const height = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || rect.height;
+  const width = window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || cachedStageWidth || 1;
+  const height = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || cachedStageHeight || 1;
   return {
-    width: Math.max(1, width),
-    height: Math.max(1, height),
+    width: roundedViewportValue(width),
+    height: roundedViewportValue(height),
   };
 }
 
 function syncCanvasSize() {
   const { width, height } = readStageSize();
   const profile = performanceProfile();
-  const ratio = Math.max(1, Math.min(profile.maxDpr, window.devicePixelRatio || 1));
-  const backingWidth = Math.max(1, Math.round(width * ratio));
-  const backingHeight = Math.max(1, Math.round(height * ratio));
+  cachedDevicePixelRatio = window.devicePixelRatio || 1;
+  const forcedDpr = Number.isFinite(dprTestValue) && dprTestValue > 0 ? Math.max(1, Math.min(2, dprTestValue)) : 0;
+  const ratio = forcedDpr || Math.max(1, Math.min(profile.maxDpr, cachedDevicePixelRatio));
+  const stableWidth = cachedCssStageWidth && Math.abs(width - cachedCssStageWidth) < 2 ? cachedCssStageWidth : width;
+  const stableHeight = cachedCssStageHeight && Math.abs(height - cachedCssStageHeight) < 2 ? cachedCssStageHeight : height;
+  const backingWidth = Math.max(1, Math.round(stableWidth * ratio));
+  const backingHeight = Math.max(1, Math.round(stableHeight * ratio));
+  const backingSignature = `${backingWidth}x${backingHeight}@${ratio.toFixed(3)}`;
   if (canvas.width !== backingWidth || canvas.height !== backingHeight) {
+    const rebuildStart = performance.now();
+    cacheRebuildInProgress = true;
     canvas.width = backingWidth;
     canvas.height = backingHeight;
+    cachedBackingWidth = backingWidth;
+    cachedBackingHeight = backingHeight;
+    backingRebuildCount += 1;
+    pushRecentEvent(backingRebuildEvents, performance.now());
+    lastBackingSignature = backingSignature;
+    backingSignatureHistory.push(backingSignature);
+    if (backingSignatureHistory.length > 8) backingSignatureHistory.shift();
+    lastCacheRebuildMs = performance.now() - rebuildStart;
+    cacheRebuildInProgress = false;
   }
+  cachedCssStageWidth = stableWidth;
+  cachedCssStageHeight = stableHeight;
+  renderedDpr = ratio;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  setCssVar('--viewport-width', `${width.toFixed(2)}px`);
-  setCssVar('--viewport-height', `${height.toFixed(2)}px`);
-  document.documentElement.dataset.performance = profile.mode;
-  return { width, height, ratio };
+  setCssVar('--viewport-width', `${stableWidth.toFixed(2)}px`);
+  setCssVar('--viewport-height', `${stableHeight.toFixed(2)}px`);
+  document.documentElement.dataset.performance = 'quality';
+  return { width: stableWidth, height: stableHeight, ratio };
 }
 
 function coreVisualMetrics(stageWidth, stageHeight) {
+  layoutReadCount += 1;
   const rect = core.getBoundingClientRect();
   const hasRect = rect.width > 0 && rect.height > 0;
   return {
@@ -666,22 +908,43 @@ function coreVisualMetrics(stageWidth, stageHeight) {
 }
 
 function resize() {
+  const now = performance.now();
+  resizeEventCount += 1;
+  pushRecentEvent(resizeEvents, now);
   const result = syncCanvasSize();
   cachedStageWidth = result.width;
   cachedStageHeight = result.height;
   cachedRatio = result.ratio;
   cachedCoreMetrics = coreVisualMetrics(result.width, result.height);
+  lastResizeAt = now;
+  const sizeSignature = `${result.width}x${result.height}@${result.ratio.toFixed(3)}`;
+  if (sizeSignature !== lastSizeSignature) {
+    lastSizeSignature = sizeSignature;
+    if (!debugNoBgCacheRebuild) {
+      const rebuildStart = performance.now();
+      cacheRebuildInProgress = true;
+      rippleUnitGradient = null;
+      visualizerGeometryCache.key = '';
+      recordCacheRebuild('other', performance.now() - rebuildStart);
+      lastCacheRebuildMs = performance.now() - rebuildStart;
+      cacheRebuildInProgress = false;
+    }
+  }
 }
 
 function scheduleLayoutSync() {
   lastLayoutSignature = '';
-  resize();
-  for (const delay of [80, 180, 360, 720]) {
-    window.setTimeout(() => {
-      lastLayoutSignature = '';
+  if (!resizeFrameId) {
+    resizeFrameId = window.requestAnimationFrame(() => {
+      resizeFrameId = 0;
       resize();
-    }, delay);
+    });
   }
+  for (const id of resizeTimerIds) window.clearTimeout(id);
+  resizeTimerIds = [100, 260, 620].map((delay) => window.setTimeout(() => {
+    lastLayoutSignature = '';
+    resize();
+  }, delay));
 }
 
 function setupAudioGraph() {
@@ -888,6 +1151,17 @@ function setAmbientFallback() {
   setCssVar('--ambient-c', '18, 10, 32');
 }
 
+function decodeImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+    if (image.decode) image.decode().then(() => resolve(image)).catch(() => {});
+  });
+}
+
 async function setAmbientFromTrack(track) {
   const url = track?.backgroundUrl || '';
   const token = ++ambientToken;
@@ -896,17 +1170,29 @@ async function setAmbientFromTrack(track) {
     return;
   }
 
-  background.classList.add('has-cover');
-  background.style.setProperty('--ambient-cover', `url("${url}")`);
+  if (debugNoBgCacheRebuild && !audio.paused && background.classList.contains('has-cover')) {
+    return;
+  }
 
   try {
+    cacheRebuildInProgress = true;
+    const rebuildStart = performance.now();
+    await decodeImage(url);
+    if (token !== ambientToken) return;
+    background.classList.add('has-cover');
+    background.style.setProperty('--ambient-cover', `url("${url}")`);
+    recordCacheRebuild('background', performance.now() - rebuildStart);
+    cacheRebuildInProgress = false;
     const palette = await extractPalette(url);
     if (token !== ambientToken) return;
     setCssVar('--ambient-a', palette[0]);
     setCssVar('--ambient-b', palette[1]);
     setCssVar('--ambient-c', palette[2]);
   } catch {
+    cacheRebuildInProgress = false;
     if (token === ambientToken) setAmbientFallback();
+  } finally {
+    if (token === ambientToken) cacheRebuildInProgress = false;
   }
 }
 
@@ -994,6 +1280,12 @@ async function playIndex(index) {
   syncTrackText();
   setText(coreSubtitle, track.timingPoints?.length ? text('beatSync') : text('audioSync'));
   setText(miniState, text('loading'));
+  activeInheritedTimingPoints = [];
+  activeAllTimingPoints = [];
+  for (const point of track.timingPoints || []) {
+    if (Number.isFinite(point.offset)) activeAllTimingPoints.push(point);
+    if (point.uninherited && point.beatLength > 0) activeInheritedTimingPoints.push(point);
+  }
   activeTimingPoint = pickTimingPoint(track, 0);
   activeEffectPoint = pickEffectPoint(track, 0);
   currentBeatLengthMs = activeTimingPoint?.beatLength || 620;
@@ -1025,9 +1317,14 @@ async function playIndex(index) {
   scytheEvents = [];
   sideMode = 'idle';
   sideModeUntil = 0;
-  starParticles = [];
-  fountainBursts = [];
-  rippleRings = [];
+  for (const particle of particles) recycleParticle(particle);
+  for (const particle of starParticles) recycleStarParticle(particle);
+  for (const burst of fountainBursts) recycleFountainBurst(burst);
+  for (const ring of rippleRings) recycleRippleRing(ring);
+  particles.length = 0;
+  starParticles.length = 0;
+  fountainBursts.length = 0;
+  rippleRings.length = 0;
   lastKiaiState = false;
   lastFountainAt = -10000;
   lastAudioFountainAt = -10000;
@@ -1072,9 +1369,11 @@ async function playIndex(index) {
 }
 
 function pickTimingPoint(track, currentMs) {
-  const inherited = (track.timingPoints || []).filter((point) => point.uninherited && point.beatLength > 0);
-  let picked = inherited[0] || null;
-  for (const point of inherited) {
+  const points = track === tracks[activeIndex] ? activeInheritedTimingPoints : (track.timingPoints || []);
+  let picked = null;
+  for (const point of points) {
+    if (!point.uninherited || point.beatLength <= 0) continue;
+    if (!picked) picked = point;
     if (point.offset <= currentMs) picked = point;
     else break;
   }
@@ -1082,9 +1381,10 @@ function pickTimingPoint(track, currentMs) {
 }
 
 function pickEffectPoint(track, currentMs) {
-  const points = (track.timingPoints || []).filter((point) => Number.isFinite(point.offset));
+  const points = track === tracks[activeIndex] ? activeAllTimingPoints : (track.timingPoints || []);
   let picked = points[0] || null;
   for (const point of points) {
+    if (!Number.isFinite(point.offset)) continue;
     if (point.offset <= currentMs) picked = point;
     else break;
   }
@@ -1291,7 +1591,7 @@ function flashSide(side, amount, layer = 'soft', reason = 'beat', beatIndex = la
     beat: beatIndex,
     kiai: Boolean(activeEffectPoint?.kiai),
   });
-  scytheEvents = scytheEvents.slice(-36);
+  while (scytheEvents.length > 36) scytheEvents.shift();
   return true;
 }
 
@@ -1360,6 +1660,23 @@ function bandAverage(start, end) {
   return count ? sum / count / 255 : 0;
 }
 
+function insertVisualizerCandidate(count, limit, index, target, score) {
+  if (count >= limit && score <= visualizerCandidateScores[count - 1]) return count;
+  let position = Math.min(count, limit - 1);
+  while (position > 0 && score > visualizerCandidateScores[position - 1]) {
+    if (position < limit) {
+      visualizerCandidateScores[position] = visualizerCandidateScores[position - 1];
+      visualizerCandidateTargets[position] = visualizerCandidateTargets[position - 1];
+      visualizerCandidateIndexes[position] = visualizerCandidateIndexes[position - 1];
+    }
+    position -= 1;
+  }
+  visualizerCandidateScores[position] = score;
+  visualizerCandidateTargets[position] = target;
+  visualizerCandidateIndexes[position] = index;
+  return Math.min(limit, count + 1);
+}
+
 function updateAudioEnergy() {
   if (!analyser || !freqData || audio.paused) {
     lowEnergy *= 0.94;
@@ -1419,7 +1736,7 @@ function updateAudioEnergy() {
   lastDrive = drive;
 }
 
-function updateLogoAmplitudes(now, elapsed) {
+function updateLogoAmplitudes(now, elapsed, profile) {
   const decayFactor = elapsed * 0.0024 * Math.max(0.05, settings.visualizerDecay);
   for (let i = 0; i < visualizerBars.length; i += 1) {
     visualizerBars[i] -= decayFactor * (visualizerBars[i] + 0.03);
@@ -1440,7 +1757,9 @@ function updateLogoAmplitudes(now, elapsed) {
   const contrast = Math.max(0.1, settings.visualizerContrast || 1.6);
   const startupLimiter = Math.min(1, Math.max(0.08, trackTime / 4.5)) * startupGuard;
   const attackLimit = (0.014 + Math.min(0.062, audioAmplitude * 0.075)) * (activeEffectPoint?.kiai ? 1.12 : 1) * (0.42 + warmup * 0.58);
-  const candidates = [];
+  const candidateLimit = Math.round((activeEffectPoint?.kiai ? 20 : 14) + warmup * (activeEffectPoint?.kiai ? 24 : 18));
+  const spreadRadius = warmup < 0.42 ? 1 : 2;
+  let candidateCount = 0;
 
   if (!visualizerPrimed) {
     for (let i = 0; i < visualizerBars.length; i += 1) {
@@ -1468,25 +1787,23 @@ function updateLogoAmplitudes(now, elapsed) {
     const compressed = Math.min(1, normalised);
     const shaped = Math.pow(compressed, contrast * 0.9);
     const target = Math.min(0.72, shaped * (0.4 + contrast * 0.1) * kiaiMultiplier * userScale * startupLimiter);
-    if (target > visualizerBars[i]) candidates.push({ index: i, target, score: target + freshLift * 0.5 });
+    if (target > visualizerBars[i]) {
+      candidateCount = insertVisualizerCandidate(candidateCount, candidateLimit, i, target, target + freshLift * 0.5);
+    }
   }
 
-  const candidateLimit = Math.round((activeEffectPoint?.kiai ? 20 : 14) + warmup * (activeEffectPoint?.kiai ? 24 : 18));
-  const spreadRadius = warmup < 0.42 ? 1 : 2;
-
-  candidates
-    .sort((a, b) => b.score - a.score)
-    .slice(0, candidateLimit)
-    .forEach(({ index, target }) => {
-      for (let spread = -spreadRadius; spread <= spreadRadius; spread += 1) {
-        const wrapped = (index + spread + visualizerBars.length) % visualizerBars.length;
-        const falloff = spread === 0 ? 1 : Math.abs(spread) === 1 ? 0.54 : 0.24;
-        const spreadTarget = target * falloff;
-        if (spreadTarget > visualizerBars[wrapped]) {
-          visualizerBars[wrapped] = Math.min(spreadTarget, visualizerBars[wrapped] + attackLimit * falloff);
-        }
+  for (let candidate = 0; candidate < candidateCount; candidate += 1) {
+    const index = visualizerCandidateIndexes[candidate];
+    const target = visualizerCandidateTargets[candidate];
+    for (let spread = -spreadRadius; spread <= spreadRadius; spread += 1) {
+      const wrapped = (index + spread + visualizerBars.length) % visualizerBars.length;
+      const falloff = spread === 0 ? 1 : Math.abs(spread) === 1 ? 0.54 : 0.24;
+      const spreadTarget = target * falloff;
+      if (spreadTarget > visualizerBars[wrapped]) {
+        visualizerBars[wrapped] = Math.min(spreadTarget, visualizerBars[wrapped] + attackLimit * falloff);
       }
-    });
+    }
+  }
 
   for (let i = 1; i < visualizerBars.length - 1; i += 1) {
     const neighbourCap = Math.max(visualizerBars[i - 1], visualizerBars[i + 1]) * 0.92;
@@ -1497,22 +1814,25 @@ function updateLogoAmplitudes(now, elapsed) {
 }
 
 function spawnBurst(count = 10) {
-  const { width, height } = readStageSize();
+  const width = cachedStageWidth || readStageSize().width;
+  const height = cachedStageHeight || readStageSize().height;
   const cx = width * 0.5;
   const cy = height * 0.5;
 
   for (let i = 0; i < count; i += 1) {
     const angle = Math.random() * Math.PI * 2;
-    particles.push({
-      x: cx + Math.cos(angle) * (120 + Math.random() * 60),
-      y: cy + Math.sin(angle) * (120 + Math.random() * 60),
-      vx: Math.cos(angle) * (1.2 + Math.random() * 3.8),
-      vy: Math.sin(angle) * (1.2 + Math.random() * 3.8),
-      life: 1,
-      size: 1.8 + Math.random() * 4.6,
-    });
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const particle = acquireParticle();
+    particle.x = cx + cos * (120 + Math.random() * 60);
+    particle.y = cy + sin * (120 + Math.random() * 60);
+    particle.vx = cos * (1.2 + Math.random() * 3.8);
+    particle.vy = sin * (1.2 + Math.random() * 3.8);
+    particle.life = 1;
+    particle.size = 1.8 + Math.random() * 4.6;
+    particles.push(particle);
   }
-  particles = particles.slice(-320);
+  while (particles.length > 320) recycleParticle(particles.shift());
 }
 
 function createStarPath(innerRatio = 0.5) {
@@ -1538,17 +1858,61 @@ function createStarPath(innerRatio = 0.5) {
   return path;
 }
 
+function acquireParticle() {
+  return particlePool.pop() || { x: 0, y: 0, vx: 0, vy: 0, life: 0, size: 0 };
+}
+
+function recycleParticle(particle) {
+  if (particlePool.length < 360) particlePool.push(particle);
+}
+
+function acquireStarParticle() {
+  return starParticlePool.pop() || {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    gravity: 980,
+    age: 0,
+    duration: 0,
+    size: 0,
+    rotation: 0,
+    spin: 0,
+    hollow: false,
+  };
+}
+
+function recycleStarParticle(particle) {
+  if (starParticlePool.length < 220) starParticlePool.push(particle);
+}
+
+function acquireRippleRing() {
+  return rippleRingPool.pop() || { start: 0, duration: 0, power: 0, reason: '' };
+}
+
+function recycleRippleRing(ring) {
+  if (rippleRingPool.length < 16) rippleRingPool.push(ring);
+}
+
+function acquireFountainBurst() {
+  return fountainBurstPool.pop() || { start: 0, end: 0, power: 0, direction: 0, lastSpawn: 0 };
+}
+
+function recycleFountainBurst(burst) {
+  if (fountainBurstPool.length < 8) fountainBurstPool.push(burst);
+}
+
 function spawnRipple(power = 0.6, reason = 'beat') {
   const now = performance.now();
   if (now - lastRippleAt < 140) return;
   lastRippleAt = now;
-  rippleRings.push({
-    start: now,
-    duration: 980 + power * 520,
-    power,
-    reason,
-  });
-  rippleRings = rippleRings.slice(-10);
+  const ring = acquireRippleRing();
+  ring.start = now;
+  ring.duration = 980 + power * 520;
+  ring.power = power;
+  ring.reason = reason;
+  rippleRings.push(ring);
+  while (rippleRings.length > 10) recycleRippleRing(rippleRings.shift());
 }
 
 function maybeTriggerStarFountain(power = 1, reason = 'kiai') {
@@ -1583,19 +1947,19 @@ function triggerStarFountain(power = 1, reason = 'kiai') {
   lastFountainAt = now;
 
   const direction = Math.floor(Math.random() * 3) - 1;
-  fountainBursts.push({
-    start: now,
-    end: now + 720 + power * 170,
-    power: Math.min(1.9, power * settings.fountain),
-    direction,
-    lastSpawn: now - 20,
-  });
-  fountainBursts = fountainBursts.slice(-2);
+  const burst = acquireFountainBurst();
+  burst.start = now;
+  burst.end = now + 720 + power * 170;
+  burst.power = Math.min(1.9, power * settings.fountain);
+  burst.direction = direction;
+  burst.lastSpawn = now - 20;
+  fountainBursts.push(burst);
+  while (fountainBursts.length > 2) recycleFountainBurst(fountainBursts.shift());
 }
 
-function updateStarFountains(now, elapsed) {
-  const profile = performanceProfile();
-  const { width, height } = readStageSize();
+function updateStarFountains(now, elapsed, profile) {
+  const width = cachedStageWidth || readStageSize().width;
+  const height = cachedStageHeight || readStageSize().height;
   const isPortrait = height > width * 1.18;
   const originOffset = isPortrait
     ? Math.max(54, width * 0.24)
@@ -1621,19 +1985,19 @@ function updateStarFountains(now, elapsed) {
           : burst.direction * side * 360 * (1 - progress * 1.8);
         const vx = fan + (Math.random() - 0.5) * (isPortrait ? 90 : 150);
         const vy = (isPortrait ? -880 : -1020) - Math.random() * (isPortrait ? 360 : 460) - burst.power * (isPortrait ? 210 : 260);
-        starParticles.push({
-          x,
-          y,
-          vx,
-          vy,
-          gravity: 980,
-          age: 0,
-          duration: 560 + Math.random() * 620,
-          size: 9 + Math.random() * 9,
-          rotation: Math.random() * Math.PI * 2,
-          spin: (Math.random() - 0.5) * 5.5,
-          hollow: Math.random() < 0.34,
-        });
+        const particle = acquireStarParticle();
+        particle.x = x;
+        particle.y = y;
+        particle.vx = vx;
+        particle.vy = vy;
+        particle.gravity = 980;
+        particle.age = 0;
+        particle.duration = 560 + Math.random() * 620;
+        particle.size = 9 + Math.random() * 9;
+        particle.rotation = Math.random() * Math.PI * 2;
+        particle.spin = (Math.random() - 0.5) * 5.5;
+        particle.hollow = Math.random() < 0.34;
+        starParticles.push(particle);
         spawnsThisFrame += 1;
       }
     }
@@ -1641,10 +2005,14 @@ function updateStarFountains(now, elapsed) {
 
   let fbWrite = 0;
   for (let i = 0; i < fountainBursts.length; i += 1) {
-    if (now <= fountainBursts[i].end) fountainBursts[fbWrite++] = fountainBursts[i];
+    if (now <= fountainBursts[i].end) {
+      fountainBursts[fbWrite++] = fountainBursts[i];
+    } else {
+      recycleFountainBurst(fountainBursts[i]);
+    }
   }
   fountainBursts.length = fbWrite;
-  if (starParticles.length > profile.starMax) starParticles.length = profile.starMax;
+  while (starParticles.length > profile.starMax) recycleStarParticle(starParticles.pop());
   let writeIndex = 0;
   for (let i = 0; i < starParticles.length; i += 1) {
     const particle = starParticles[i];
@@ -1656,6 +2024,8 @@ function updateStarFountains(now, elapsed) {
     if (particle.age < particle.duration && particle.y < height + 80) {
       starParticles[writeIndex] = particle;
       writeIndex += 1;
+    } else {
+      recycleStarParticle(particle);
     }
   }
   starParticles.length = writeIndex;
@@ -1679,9 +2049,10 @@ function makeSpriteCanvas(size) {
 }
 
 function starSprite(hollow, radius) {
-  const bucket = Math.max(8, Math.min(28, Math.round(radius)));
+  const bucket = Math.max(8, Math.min(28, Math.round(radius / 2) * 2));
   const key = `${hollow ? 'h' : 'f'}:${bucket}`;
   if (starSpriteCache.has(key)) return starSpriteCache.get(key);
+  const rebuildStart = performance.now();
   const padding = 4;
   const size = (bucket + padding) * 2;
   const sprite = makeSpriteCanvas(size);
@@ -1698,6 +2069,7 @@ function starSprite(hollow, radius) {
     spriteCtx.fill(starPath);
   }
   starSpriteCache.set(key, sprite);
+  recordCacheRebuild('star', performance.now() - rebuildStart);
   return sprite;
 }
 
@@ -1713,6 +2085,7 @@ function starGlowSprite(radius) {
   const bucket = Math.max(12, Math.min(56, Math.round(radius / 4) * 4));
   const key = String(bucket);
   if (starGlowSpriteCache.has(key)) return starGlowSpriteCache.get(key);
+  const rebuildStart = performance.now();
   const size = bucket * 2;
   const sprite = makeSpriteCanvas(size);
   const spriteCtx = sprite.getContext('2d');
@@ -1723,13 +2096,40 @@ function starGlowSprite(radius) {
   spriteCtx.fillStyle = gradient;
   spriteCtx.fillRect(0, 0, size, size);
   starGlowSpriteCache.set(key, sprite);
+  recordCacheRebuild('star', performance.now() - rebuildStart);
   return sprite;
+}
+
+function prewarmStarSprites() {
+  const warmStart = performance.now();
+  for (let bucket = 8; bucket <= 28; bucket += 2) {
+    starSprite(false, bucket);
+    starSprite(true, bucket);
+  }
+  for (let bucket = 12; bucket <= 56; bucket += 4) {
+    starGlowSprite(bucket);
+  }
+  recordCacheRebuild('star', performance.now() - warmStart);
+}
+
+function rippleGradient() {
+  if (rippleUnitGradient) return rippleUnitGradient;
+  const rebuildStart = performance.now();
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.74)');
+  gradient.addColorStop(0.24, 'rgba(255, 255, 255, 0.36)');
+  gradient.addColorStop(0.58, 'rgba(255, 255, 255, 0.13)');
+  gradient.addColorStop(0.82, 'rgba(255, 255, 255, 0.035)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  rippleUnitGradient = gradient;
+  recordCacheRebuild('ripple', performance.now() - rebuildStart);
+  return rippleUnitGradient;
 }
 
 function drawRippleRings(cx, cy, coreSize, now, stageWidth, stageHeight) {
   ctx.save();
-  ctx.translate(cx, cy);
   ctx.globalCompositeOperation = 'lighter';
+  const gradient = rippleGradient();
   let rrWrite = 0;
   for (let i = 0; i < rippleRings.length; i += 1) {
     const ring = rippleRings[i];
@@ -1739,17 +2139,20 @@ function drawRippleRings(cx, cy, coreSize, now, stageWidth, stageHeight) {
     const radius = coreSize * 0.46 + eased * maxRadius;
     const fade = Math.pow(1 - progress, 1.06);
     const alpha = fade * (0.34 + ring.power * 0.28) * Math.max(0, settings.waveIntensity);
-    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-    gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.74})`);
-    gradient.addColorStop(0.24, `rgba(255, 255, 255, ${alpha * 0.36})`);
-    gradient.addColorStop(0.58, `rgba(255, 255, 255, ${alpha * 0.13})`);
-    gradient.addColorStop(0.82, `rgba(255, 255, 255, ${alpha * 0.035})`);
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(radius, radius);
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
     ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
     ctx.fill();
-    if (now - ring.start < ring.duration) rippleRings[rrWrite++] = ring;
+    ctx.restore();
+    if (now - ring.start < ring.duration) {
+      rippleRings[rrWrite++] = ring;
+    } else {
+      recycleRippleRing(ring);
+    }
   }
   ctx.restore();
   rippleRings.length = rrWrite;
@@ -1772,20 +2175,282 @@ function updateProgress() {
   setText(miniTime, currentText);
 }
 
+function createDebugPerfPanel() {
+  if (!debugPerfEnabled && !fpsOnlyEnabled) return null;
+  const panel = document.createElement('pre');
+  panel.id = 'debug-perf-panel';
+  panel.dataset.debugPerfPanel = debugPerfEnabled ? 'full' : 'fps-only';
+  panel.style.cssText = [
+    'position:fixed',
+    'right:10px',
+    'bottom:10px',
+    'z-index:9999',
+    'margin:0',
+    'padding:8px 10px',
+    'max-width:min(360px,calc(100vw - 20px))',
+    'pointer-events:none',
+    'font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+    'color:rgba(255,255,255,0.92)',
+    'background:rgba(7,5,13,0.72)',
+    'border:1px solid rgba(255,255,255,0.16)',
+    'border-radius:8px',
+    'box-shadow:0 10px 34px rgba(0,0,0,0.28)',
+    'white-space:pre-wrap',
+    'contain:layout paint style',
+  ].join(';');
+  document.body.appendChild(panel);
+  return panel;
+}
+
+const debugPerfPanel = createDebugPerfPanel();
+
+function heapUsageText() {
+  const memory = performance.memory;
+  if (!memory) return 'unsupported';
+  return `${(memory.usedJSHeapSize / 1048576).toFixed(1)} / ${(memory.jsHeapSizeLimit / 1048576).toFixed(0)} MB`;
+}
+
+function percentile(sortedValues, ratio) {
+  if (!sortedValues.length) return 0;
+  const index = Math.min(sortedValues.length - 1, Math.max(0, Math.ceil(sortedValues.length * ratio) - 1));
+  return sortedValues[index];
+}
+
+function recordRenderStage(name, duration) {
+  if (!renderStageStatsEnabled) return;
+  const events = renderStageWindows[name];
+  if (!events) return;
+  events.push({ at: performance.now(), ms: duration });
+}
+
+function updateRenderStageSummaries(now) {
+  const cutoff = now - 10000;
+  for (const name of renderStageNames) {
+    const events = renderStageWindows[name];
+    while (events.length && events[0].at < cutoff) events.shift();
+    if (!events.length) {
+      renderStageSummary[name].avg = 0;
+      renderStageSummary[name].p95 = 0;
+      renderStageSummary[name].count = 0;
+      continue;
+    }
+    let total = 0;
+    const values = new Array(events.length);
+    for (let i = 0; i < events.length; i += 1) {
+      const ms = events[i].ms;
+      values[i] = ms;
+      total += ms;
+    }
+    values.sort((a, b) => a - b);
+    renderStageSummary[name].avg = total / events.length;
+    renderStageSummary[name].p95 = percentile(values, 0.95);
+    renderStageSummary[name].count = events.length;
+  }
+}
+
+function topRenderStages(limit = 3) {
+  return renderStageNames
+    .map((name) => ({ name, ...renderStageSummary[name] }))
+    .sort((a, b) => b.p95 - a.p95)
+    .slice(0, limit);
+}
+
+function updatePerfSummary(now, elapsed) {
+  if (!perfStatsEnabled) return;
+  frameStatsWindow.push({ at: now, ms: elapsed });
+  const cutoff = now - 10000;
+  while (frameStatsWindow.length && frameStatsWindow[0].at < cutoff) frameStatsWindow.shift();
+  const sampleCount = frameStatsWindow.length;
+  if (!sampleCount) return;
+
+  const duration = Math.max(1, frameStatsWindow[sampleCount - 1].at - frameStatsWindow[0].at);
+  let minFrame = Infinity;
+  let maxFrame = 0;
+  let droppedFrames = 0;
+  let longFrames = 0;
+  let veryLongFrames = 0;
+  const frameTimes = new Array(sampleCount);
+  for (let i = 0; i < sampleCount; i += 1) {
+    const frameMs = frameStatsWindow[i].ms;
+    frameTimes[i] = frameMs;
+    if (frameMs < minFrame) minFrame = frameMs;
+    if (frameMs > maxFrame) maxFrame = frameMs;
+    if (frameMs > 33) longFrames += 1;
+    if (frameMs > 50) veryLongFrames += 1;
+    droppedFrames += Math.max(0, Math.floor(frameMs / 16.67) - 1);
+  }
+  frameTimes.sort((a, b) => a - b);
+  perfSummary.avgFps = sampleCount * 1000 / duration;
+  perfSummary.minFps = minFrame > 0 ? 1000 / maxFrame : 0;
+  perfSummary.maxFps = minFrame > 0 ? 1000 / minFrame : 0;
+  perfSummary.p95FrameMs = percentile(frameTimes, 0.95);
+  perfSummary.p99FrameMs = percentile(frameTimes, 0.99);
+  perfSummary.droppedFrames = droppedFrames;
+  perfSummary.longFrames = longFrames;
+  perfSummary.veryLongFrames = veryLongFrames;
+  perfSummary.sampleCount = sampleCount;
+
+  if (perfLogEnabled && now - lastPerfLogAt >= 10000) {
+    lastPerfLogAt = now;
+    updateRenderStageSummaries(now);
+    console.log('[perfLog]', {
+      fps: Number(latestFps.toFixed(1)),
+      avgFps10s: Number(perfSummary.avgFps.toFixed(1)),
+      p95FrameMs: Number(perfSummary.p95FrameMs.toFixed(2)),
+      p99FrameMs: Number(perfSummary.p99FrameMs.toFixed(2)),
+      droppedFrames,
+      longFrames,
+      veryLongFrames,
+      visualizerBars: lastVisualizerBarCount,
+      visualizerDrawBatches: lastVisualizerDrawBatchCount,
+      canvasStateChanges: lastCanvasStateChangeCount,
+      renderStages10s: Object.fromEntries(renderStageNames.map((name) => [name, {
+        avgMs: Number(renderStageSummary[name].avg.toFixed(3)),
+        p95Ms: Number(renderStageSummary[name].p95.toFixed(3)),
+      }])),
+      compositeSafeMode,
+      safeCssSource,
+    });
+  }
+}
+
+function updateDebugPerfPanel(now) {
+  const updateMs = fpsOnlyEnabled && !debugPerfEnabled ? FPS_ONLY_UPDATE_MS : DEBUG_PANEL_UPDATE_MS;
+  if (!debugPerfPanel || now - lastPerfPanelUpdate < updateMs) return;
+  lastPerfPanelUpdate = now;
+  if (renderStageStatsEnabled) updateRenderStageSummaries(now);
+  if (fpsOnlyEnabled && !debugPerfEnabled) {
+    const textValue = [
+      `FPS: ${latestFps.toFixed(1)}`,
+      `avg FPS 10s: ${perfSummary.avgFps.toFixed(1)}`,
+      `P95 frame 10s: ${perfSummary.p95FrameMs.toFixed(2)} ms`,
+      `debug panel update hz: ${(1000 / updateMs).toFixed(1)}`,
+    ].join('\n');
+    if (textValue !== lastPerfPanelText) {
+      debugPerfPanel.textContent = textValue;
+      lastPerfPanelText = textValue;
+    }
+    return;
+  }
+  const resizeCount5s = pruneRecentEvents(resizeEvents, now);
+  const backingCount5s = pruneRecentEvents(backingRebuildEvents, now);
+  const backgroundCache5s = pruneRecentEvents(cacheRebuildEvents.background, now);
+  const glowCache5s = pruneRecentEvents(cacheRebuildEvents.glow, now);
+  const rippleCache5s = pruneRecentEvents(cacheRebuildEvents.ripple, now);
+  const starCache5s = pruneRecentEvents(cacheRebuildEvents.star, now);
+  const spectrumCache5s = pruneRecentEvents(cacheRebuildEvents.spectrum, now);
+  const otherCache5s = pruneRecentEvents(cacheRebuildEvents.other, now);
+  const resizePrefix = debugShowResize && (resizeCount5s || backingCount5s) ? '! ' : '';
+  const stageTopText = topRenderStages(3)
+    .map((stage) => `${stage.name} ${stage.avg.toFixed(2)}/${stage.p95.toFixed(2)}ms`)
+    .join(' | ');
+  const visualViewportText = window.visualViewport
+    ? `${window.visualViewport.width.toFixed(1)} x ${window.visualViewport.height.toFixed(1)}`
+    : 'unsupported';
+  const textValue = [
+    `FPS: ${latestFps.toFixed(1)}`,
+    `frame: ${latestFrameTimeMs.toFixed(2)} ms`,
+    `window: ${window.innerWidth} x ${window.innerHeight}`,
+    `visualViewport: ${visualViewportText}`,
+    `canvas CSS: ${cachedCssStageWidth.toFixed(0)} x ${cachedCssStageHeight.toFixed(0)}`,
+    `canvas backing: ${canvas.width} x ${canvas.height}`,
+    `devicePixelRatio: ${cachedDevicePixelRatio.toFixed(2)}`,
+    `renderer DPR: ${renderedDpr.toFixed(3)}`,
+    `compositeSafeMode: ${compositeSafeMode ? 'on' : 'off'} (${compositeSafeReason})`,
+    `effectiveCssSafe: ${effectiveCssSafe ? 'on' : 'off'}`,
+    `safeCssSource: ${safeCssSource}`,
+    `unsafeCssFxActive: ${effectiveCssSafe ? 'no' : 'yes'}`,
+    `avg FPS 10s: ${perfSummary.avgFps.toFixed(1)} min/max: ${perfSummary.minFps.toFixed(1)} / ${perfSummary.maxFps.toFixed(1)}`,
+    `P95/P99 frame 10s: ${perfSummary.p95FrameMs.toFixed(2)} / ${perfSummary.p99FrameMs.toFixed(2)} ms`,
+    `dropped est 10s: ${perfSummary.droppedFrames} long>33ms: ${perfSummary.longFrames} veryLong>50ms: ${perfSummary.veryLongFrames}`,
+    `stage top3 avg/P95 10s: ${stageTopText}`,
+    `debug panel update hz: ${(1000 / DEBUG_PANEL_UPDATE_MS).toFixed(1)}`,
+    `${resizePrefix}resize 5s: ${resizeCount5s} / total ${resizeEventCount}`,
+    `${resizePrefix}backing rebuild 5s: ${backingCount5s} / total ${backingRebuildCount}`,
+    `backing signatures: ${backingSignatureHistory.join(' -> ') || lastBackingSignature || 'none'}`,
+    `active render loops: ${activeRenderLoopCount}`,
+    `particles/frame: ${lastParticleCount}`,
+    `visualizer bars/frame: ${lastVisualizerBarCount}`,
+    `visualizer draw batches/frame: ${lastVisualizerDrawBatchCount}`,
+    `canvas state changes/frame: ${lastCanvasStateChangeCount}`,
+    `path rebuilds 5s: ${spectrumCache5s}`,
+    `cached layers: spectrum ${visualizerGeometryCache.key ? 'yes' : 'warming'} / ripple ${rippleUnitGradient ? 'yes' : 'warming'} / star ${starSpriteCache.size + starGlowSpriteCache.size}`,
+    `cache rebuilds total: ${totalCacheRebuilds()}`,
+    `cache 5s bg/glow/ripple/star/spectrum/other: ${backgroundCache5s}/${glowCache5s}/${rippleCache5s}/${starCache5s}/${spectrumCache5s}/${otherCache5s}`,
+    `cache total bg/glow/ripple/star/spectrum/other: ${backgroundCacheRebuildCount}/${glowCacheRebuildCount}/${rippleCacheRebuildCount}/${starCacheRebuildCount}/${spectrumGeometryRebuildCount}/${otherCacheRebuildCount}`,
+    `last cache rebuild: ${lastCacheRebuildMs.toFixed(2)} ms`,
+    `rebuilding cache: ${cacheRebuildInProgress ? 'yes' : 'no'}`,
+    `debug flags: allCss=${debugNoCssFx ? 'off' : 'on'} backdrop=${debugNoBackdropFx ? 'off' : 'on'} blur=${debugNoBlurFx ? 'off' : 'on'} blend=${debugNoBlendFx ? 'off' : 'on'} shadow=${debugNoShadowFx ? 'off' : 'on'}`,
+    `debug flags: side=${debugNoSideLightFx ? 'off' : 'on'} bgCss=${debugNoBgCssFx ? 'off' : 'on'} panelBackdrop=${debugNoPanelBackdropFx ? 'off' : 'on'} noBgCacheRebuild=${debugNoBgCacheRebuild ? '1' : '0'} solidCanvasBg=${debugSolidCanvasBg ? '1' : '0'}`,
+    `combo flags: allBg=${debugNoAllBgFx ? 'off' : 'on'} allPanel=${debugNoAllPanelFx ? 'off' : 'on'} allLight=${debugNoAllLightFx ? 'off' : 'on'} allAnim=${debugNoAllAnimationFx ? 'off' : 'on'} allFixed=${debugNoAllFixedFx ? 'off' : 'on'}`,
+    `combo flags: cssButKeepBg=${debugNoCssFxButKeepBg ? '1' : '0'} cssOnlyBg=${debugNoCssFxOnlyBg ? '1' : '0'}`,
+    `bg flags: freeze=${debugFreezeBg ? '1' : '0'} noImage=${debugNoBgImage ? '1' : '0'} noPseudo=${debugNoBgPseudo ? '1' : '0'} noAnim=${debugNoBgAnimation ? '1' : '0'} blendOnly=${debugNoBgBlendOnly ? 'off' : 'on'} filterOnly=${debugNoBgFilterOnly ? 'off' : 'on'} transformOnly=${debugNoBgTransformOnly ? 'off' : 'on'} opacityOnly=${debugNoBgOpacityOnly ? 'off' : 'on'}`,
+    `canvas debug: noClear=${debugNoCanvasClear ? '1' : '0'} noBg=${debugNoCanvasBgDraw ? '1' : '0'} noCore=${debugNoCoreDraw ? '1' : '0'} noSpectrum=${debugNoSpectrumDraw ? '1' : '0'} noRipple=${debugNoRippleDraw ? '1' : '0'} noStar=${debugNoStarDraw ? '1' : '0'} noGlow=${debugNoGlowDraw ? '1' : '0'} dprTest=${Number.isFinite(dprTestValue) && dprTestValue > 0 ? dprTestValue : 'off'}`,
+    `tab hidden: ${document.hidden ? 'yes' : 'no'}`,
+    `last resize: ${(now - lastResizeAt).toFixed(0)} ms ago`,
+    `layout reads: ${layoutReadCount}`,
+    `JS heap: ${heapUsageText()}`,
+  ].join('\n');
+  if (textValue !== lastPerfPanelText) {
+    debugPerfPanel.textContent = textValue;
+    lastPerfPanelText = textValue;
+  }
+}
+
+function resetCanvasState() {
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.filter = 'none';
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
+}
+
+function scheduleNextFrame() {
+  rafId = window.requestAnimationFrame(draw);
+}
+
+function startRenderLoop() {
+  if (renderLoopRunning) return;
+  renderLoopRunning = true;
+  activeRenderLoopCount = 1;
+  window.__osuVisualShellActiveRenderLoops = activeRenderLoopCount;
+  scheduleNextFrame();
+}
+
 function draw() {
-  requestAnimationFrame(draw);
+  rafId = 0;
+  scheduleNextFrame();
   try {
   const now = performance.now();
   const elapsed = Math.min(80, now - lastFrameAt);
   lastFrameAt = now;
+  latestFrameTimeMs = elapsed;
+  lastCanvasStateChangeCount = 0;
+  frameCountForStats += 1;
+  frameTimeSum += elapsed;
+  if (frameTimeSum >= 250) {
+    latestFps = frameCountForStats * 1000 / frameTimeSum;
+    frameCountForStats = 0;
+    frameTimeSum = 0;
+  }
+  let stageStart = renderStageStatsEnabled ? performance.now() : 0;
+  updatePerfSummary(now, elapsed);
+  if (renderStageStatsEnabled) {
+    recordRenderStage('debugStats', performance.now() - stageStart);
+    stageStart = performance.now();
+  }
   updateAdaptiveQuality(elapsed);
   const profile = performanceProfile();
 
   updateAudioEnergy();
-  updateLogoAmplitudes(now, elapsed);
+  updateLogoAmplitudes(now, elapsed, profile);
   updateTiming();
   updateProgress();
-  updateStarFountains(now, elapsed);
+  updateStarFountains(now, elapsed, profile);
 
   timingPulse *= Math.exp(-elapsed / 88);
   logoPulse *= Math.exp(-elapsed / 102);
@@ -1804,9 +2469,10 @@ function draw() {
   const rightHard = envelopeValue(sideEnvelopes.rightHard, now);
   leftFlash = Math.max(leftSoft, leftHard);
   rightFlash = Math.max(rightSoft, rightHard);
-  for (const key of Object.keys(sideEnvelopes)) {
-    if (!envelopeAlive(sideEnvelopes[key], now)) sideEnvelopes[key] = null;
-  }
+  if (!envelopeAlive(sideEnvelopes.leftSoft, now)) sideEnvelopes.leftSoft = null;
+  if (!envelopeAlive(sideEnvelopes.rightSoft, now)) sideEnvelopes.rightSoft = null;
+  if (!envelopeAlive(sideEnvelopes.leftHard, now)) sideEnvelopes.leftHard = null;
+  if (!envelopeAlive(sideEnvelopes.rightHard, now)) sideEnvelopes.rightHard = null;
 
   if (now - lastInteraction > idleAfterMs) {
     if (app.dataset.panel !== 'idle') app.dataset.panel = 'idle';
@@ -1814,9 +2480,22 @@ function draw() {
   }
 
   ctx.setTransform(cachedRatio, 0, 0, cachedRatio, 0, 0);
+  resetCanvasState();
   const width = cachedStageWidth;
   const height = cachedStageHeight;
-  ctx.clearRect(0, 0, width, height);
+  if (!debugNoCanvasClear) ctx.clearRect(0, 0, width, height);
+  if (renderStageStatsEnabled) {
+    recordRenderStage('clear', performance.now() - stageStart);
+    stageStart = performance.now();
+  }
+  if (debugSolidCanvasBg && !debugNoCanvasBgDraw) {
+    ctx.fillStyle = 'rgb(7, 5, 13)';
+    ctx.fillRect(0, 0, width, height);
+  }
+  if (renderStageStatsEnabled) {
+    recordRenderStage('background', performance.now() - stageStart);
+    stageStart = performance.now();
+  }
 
   const beatMotion = !audio.paused ? continuousBeat * 0.015 : 0;
   const energy = Math.max(smoothedEnergy * 1.08, logoPulse * 0.34, coreBreath * 0.92, beatMotion);
@@ -1833,7 +2512,7 @@ function draw() {
   coreGhostScale += (coreScale - coreGhostScale) * Math.min(1, elapsed / (420 * ghostLag));
   debugScaleMin = Math.min(debugScaleMin, coreScale);
   debugScaleMax = Math.max(debugScaleMax, coreScale);
-  window.__visualDebug = {
+  if (debugPerfEnabled) window.__visualDebug = {
     coreScale,
     scaleRange: [debugScaleMin, debugScaleMax],
     energy,
@@ -1862,6 +2541,10 @@ function draw() {
     fountainBursts: fountainBursts.length,
     frameAverageMs,
     drawVisualizerAvgMs,
+    visualizerDrawBatches: lastVisualizerDrawBatchCount,
+    canvasStateChanges: lastCanvasStateChangeCount,
+    compositeSafeMode,
+    compositeSafeReason,
     performanceMode: profile.mode,
     adaptiveQuality,
     stageSize: [width, height],
@@ -1872,95 +2555,182 @@ function draw() {
     currentTime: audio.currentTime,
   };
   const coreTransform = `translate(calc(-50% + ${coreFollowX.toFixed(2)}px), calc(-50% + ${coreFollowY.toFixed(2)}px)) scale(${coreScale.toFixed(4)})`;
-  if (core.style.transform !== coreTransform) core.style.transform = coreTransform;
-  if (coreAura) {
+  if (!debugNoCoreDraw && core.style.transform !== coreTransform) core.style.transform = coreTransform;
+  if (!debugNoCoreDraw && coreAura) {
     const ghostSize = Math.max(0.05, 1 + (settings.ghostSize ?? 0));
     const relativeGhostScale = Math.max(0.2, (coreGhostScale / Math.max(0.2, coreScale)) * ghostSize * (1.025 + auraBreath * 0.12));
     const ghostTransform = `scale(${relativeGhostScale.toFixed(4)})`;
     if (coreAura.style.transform !== ghostTransform) coreAura.style.transform = ghostTransform;
   }
   const glow = Math.max(0, settings.coreGlow || 0);
-  const glowColour = hexToRgb(settings.coreGlowColor);
+  const glowColour = glowColourCache;
   const outerGlowAlpha = Math.min(0.9, (0.34 + energy * 0.5 + coreFlash * 0.22) * glow);
   const innerGlowAlpha = Math.min(0.5, (0.08 + coreFlash * 0.18) * glow);
   const innerGlowSize = (18 + coreFlash * 28).toFixed(1);
   const coreShadow = glow <= 0.001
     ? 'none'
     : `0 0 ${(54 + energy * 170 + coreFlash * 80).toFixed(1)}px rgba(${glowColour.r}, ${glowColour.g}, ${glowColour.b}, ${outerGlowAlpha.toFixed(3)}), inset 0 0 ${innerGlowSize}px rgba(255, 255, 255, ${innerGlowAlpha.toFixed(3)})`;
-  if (core.style.boxShadow !== coreShadow) core.style.boxShadow = coreShadow;
+  if (!debugNoCoreDraw && !debugNoGlowDraw && core.style.boxShadow !== coreShadow) core.style.boxShadow = coreShadow;
 
-  setCssVar('--energy', energy.toFixed(2));
-  setCssVar('--core-flash', Math.min(1, coreFlash).toFixed(2));
-  setCssVar('--core-breath', Math.min(1.2, coreBreath).toFixed(2));
-  setCssVar('--aura-breath', Math.min(1.2, auraBreath).toFixed(2));
-  setCssVar('--ghost-intensity', Math.max(0, settings.ghostIntensity || 0).toFixed(3));
-  setCssVar('--ghost-blur', Math.max(0, settings.ghostBlur || 0).toFixed(3));
+  if (!debugNoCoreDraw) {
+    setCssVar('--energy', energy.toFixed(2));
+    setCssVar('--core-flash', Math.min(1, coreFlash).toFixed(2));
+    setCssVar('--core-breath', Math.min(1.2, coreBreath).toFixed(2));
+    setCssVar('--aura-breath', Math.min(1.2, auraBreath).toFixed(2));
+    setCssVar('--ghost-intensity', Math.max(0, settings.ghostIntensity || 0).toFixed(3));
+    setCssVar('--ghost-blur', Math.max(0, settings.ghostBlur || 0).toFixed(3));
+  }
   const visualLight = Math.max(lightEnergy, sectionHeat * 0.12);
-  setCssVar('--ambient-energy', Math.min(1, Math.max(energy, visualLight * 0.38)).toFixed(3));
-  setCssVar('--light', Math.min(1.25, visualLight).toFixed(2));
-  setCssVar('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(2));
-  setCssVar('--right', Math.min(1.2, rightEnergy + rightFlash * 0.42 + visualLight * 0.18).toFixed(2));
-  setCssVar('--section', sectionHeat.toFixed(2));
-  setCssVar('--sweep', lightSweep.toFixed(2));
-  setCssVar('--flash-left', Math.min(1, leftFlash).toFixed(2));
-  setCssVar('--flash-right', Math.min(1, rightFlash).toFixed(2));
-  setCssVar('--left-soft', Math.min(1, leftSoft).toFixed(2));
-  setCssVar('--right-soft', Math.min(1, rightSoft).toFixed(2));
-  setCssVar('--left-hard', Math.min(1, leftHard).toFixed(2));
-  setCssVar('--right-hard', Math.min(1, rightHard).toFixed(2));
-
-  drawRippleRings(coreMetrics.cx, coreMetrics.cy, coreSize, now, width, height);
-  drawLogoVisualizer(coreMetrics.cx, coreMetrics.cy, coreSize);
-
-  const pStart = particles.length > profile.particleMax ? particles.length - profile.particleMax : 0;
-  let pWrite = 0;
-  for (let i = pStart; i < particles.length; i += 1) {
-    const particle = particles[i];
-    particle.x += particle.vx;
-    particle.y += particle.vy;
-    particle.vx *= 0.986;
-    particle.vy *= 0.986;
-    particle.life *= 0.962;
-    if (particle.life > 0.04) {
-      ctx.fillStyle = rgbaPink[Math.round(particle.life * 0.88 * 255)];
-      ctx.beginPath();
-      ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
-      ctx.fill();
-      particles[pWrite++] = particle;
-    }
+  if (!debugNoGlowDraw) {
+    setCssVar('--ambient-energy', Math.min(1, Math.max(energy, visualLight * 0.38)).toFixed(3));
+    setCssVar('--light', Math.min(1.25, visualLight).toFixed(2));
+    setCssVar('--left', Math.min(1.2, leftEnergy + leftFlash * 0.42 + visualLight * 0.18).toFixed(2));
+    setCssVar('--right', Math.min(1.2, rightEnergy + rightFlash * 0.42 + visualLight * 0.18).toFixed(2));
+    setCssVar('--section', sectionHeat.toFixed(2));
+    setCssVar('--sweep', lightSweep.toFixed(2));
+    setCssVar('--flash-left', Math.min(1, leftFlash).toFixed(2));
+    setCssVar('--flash-right', Math.min(1, rightFlash).toFixed(2));
+    setCssVar('--left-soft', Math.min(1, leftSoft).toFixed(2));
+    setCssVar('--right-soft', Math.min(1, rightSoft).toFixed(2));
+    setCssVar('--left-hard', Math.min(1, leftHard).toFixed(2));
+    setCssVar('--right-hard', Math.min(1, rightHard).toFixed(2));
   }
-  particles.length = pWrite;
+  if (renderStageStatsEnabled) {
+    recordRenderStage('core', performance.now() - stageStart);
+    stageStart = performance.now();
+  }
 
-  const starGlow = Math.max(0, settings.starGlow || 0);
-  if (starGlow > 0.01) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < starParticles.length; i += profile.starGlowEvery) {
-      const particle = starParticles[i];
+  if (!debugNoRippleDraw) drawRippleRings(coreMetrics.cx, coreMetrics.cy, coreSize, now, width, height);
+  if (renderStageStatsEnabled) {
+    recordRenderStage('ripple', performance.now() - stageStart);
+    stageStart = performance.now();
+  }
+  if (!debugNoSpectrumDraw) drawLogoVisualizer(coreMetrics.cx, coreMetrics.cy, coreSize, profile, now);
+  else {
+    lastVisualizerBarCount = 0;
+    lastVisualizerDrawBatchCount = 0;
+  }
+  if (renderStageStatsEnabled) {
+    recordRenderStage('spectrum', performance.now() - stageStart);
+    stageStart = performance.now();
+  }
+
+  if (!debugNoStarDraw) {
+    const pStart = particles.length > profile.particleMax ? particles.length - profile.particleMax : 0;
+    for (let i = 0; i < pStart; i += 1) recycleParticle(particles[i]);
+    let pWrite = 0;
+    for (let i = pStart; i < particles.length; i += 1) {
+      const particle = particles[i];
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.vx *= 0.986;
+      particle.vy *= 0.986;
+      particle.life *= 0.962;
+      if (particle.life > 0.04) {
+        ctx.fillStyle = rgbaPink[Math.round(particle.life * 0.88 * 255)];
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
+        ctx.fill();
+        particles[pWrite++] = particle;
+      } else {
+        recycleParticle(particle);
+      }
+    }
+    particles.length = pWrite;
+
+    const starGlow = Math.max(0, settings.starGlow || 0);
+    if (!debugNoGlowDraw && starGlow > 0.01) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < starParticles.length; i += profile.starGlowEvery) {
+        const particle = starParticles[i];
+        const progress = particle.age / particle.duration;
+        const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
+        drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
+      }
+      ctx.restore();
+    }
+
+    for (const particle of starParticles) {
       const progress = particle.age / particle.duration;
-      const alpha = Math.max(0, (1 - progress) * 0.2 * starGlow);
-      drawStarGlow(ctx, particle.x, particle.y, particle.size * (2.1 + progress * 1.8), alpha);
+      const alpha = Math.max(0, (1 - progress) * 0.92);
+      drawStar(ctx, particle.x, particle.y, particle.size * (1 + progress * 1.1), particle.rotation, alpha, particle.hollow);
     }
-    ctx.restore();
+  }
+  if (renderStageStatsEnabled) {
+    recordRenderStage('stars', performance.now() - stageStart);
+    stageStart = performance.now();
   }
 
-  for (const particle of starParticles) {
-    const progress = particle.age / particle.duration;
-    const alpha = Math.max(0, (1 - progress) * 0.92);
-    drawStar(ctx, particle.x, particle.y, particle.size * (1 + progress * 1.1), particle.rotation, alpha, particle.hollow);
+  resetCanvasState();
+  lastParticleCount = particles.length + starParticles.length + rippleRings.length;
+  if (renderStageStatsEnabled) {
+    recordRenderStage('finalComposite', performance.now() - stageStart);
+    stageStart = performance.now();
   }
+  updateDebugPerfPanel(now);
+  if (renderStageStatsEnabled) recordRenderStage('debugStats', performance.now() - stageStart);
   } catch (error) {
     window.__visualError = error?.stack || String(error);
   }
 }
 
-function drawLogoVisualizer(cx, cy, coreSize) {
-  performance.mark('dlv-start');
-  const profile = performanceProfile();
+function visualizerGeometry(profile) {
+  const key = `${visualizerBars.length}:${profile.visualizerRounds}:${profile.visualizerStep}`;
+  if (visualizerGeometryCache.key === key) return visualizerGeometryCache.values;
+  const rebuildStart = performance.now();
+  const entries = Math.ceil(visualizerBars.length / profile.visualizerStep) * profile.visualizerRounds;
+  const values = new Float32Array(entries * 3);
+  let write = 0;
+  for (let round = 0; round < profile.visualizerRounds; round += 1) {
+    const roundOffset = (round * Math.PI * 2) / profile.visualizerRounds;
+    for (let i = 0; i < visualizerBars.length; i += profile.visualizerStep) {
+      const angle = (i / visualizerBars.length) * Math.PI * 2 + roundOffset;
+      values[write++] = i;
+      values[write++] = Math.cos(angle);
+      values[write++] = Math.sin(angle);
+    }
+  }
+  visualizerGeometryCache.key = key;
+  visualizerGeometryCache.values = values;
+  recordCacheRebuild('spectrum', performance.now() - rebuildStart);
+  return values;
+}
+
+function ensureVisualizerBatchCapacity(entries) {
+  if (visualizerBatchCache.capacity >= entries) return;
+  visualizerBatchCache.capacity = entries;
+  visualizerBatchCache.darkItems = new Uint16Array(entries);
+  visualizerBatchCache.paleItems = new Uint16Array(entries);
+}
+
+function addVisualizerBarPath(pathCtx, cos, sin, radius, length, halfWidth) {
+  const hws = halfWidth * sin;
+  const hwc = halfWidth * cos;
+  const x0 = radius * cos;
+  const y0 = radius * sin;
+  const x1 = (radius + length) * cos;
+  const y1 = (radius + length) * sin;
+  pathCtx.moveTo(x0 + hws, y0 - hwc);
+  pathCtx.lineTo(x1 + hws, y1 - hwc);
+  pathCtx.lineTo(x1 - hws, y1 + hwc);
+  pathCtx.lineTo(x0 - hws, y0 + hwc);
+  pathCtx.closePath();
+}
+
+function visualizerAlphaBucket(alpha) {
+  return Math.max(0, Math.min(255, Math.round((alpha * 255) / VISUALIZER_ALPHA_BUCKET_STEP) * VISUALIZER_ALPHA_BUCKET_STEP));
+}
+
+function drawLogoVisualizer(cx, cy, coreSize, profile, now) {
+  const dlvStart = debugPerfEnabled ? performance.now() : 0;
   const bars = visualizerBars.length;
-  const visualiserRounds = profile.visualizerRounds;
+  const geometry = visualizerGeometry(profile);
+  const entries = geometry.length / 3;
+  ensureVisualizerBatchCapacity(entries);
   const baseRadius = coreSize * 0.472;
   const maxBarLength = coreSize * 0.58 * Math.max(0.05, settings.visualizerRange);
+  const paleMinLength = coreSize * 0.022;
   const barWidth = Math.max(5.2, (Math.PI * 2 * coreSize * 0.5) / bars * 0.86);
   const deadZone = Math.max(0.0075, 1 / Math.max(1, maxBarLength));
   const darkWidth = barWidth * 0.92;
@@ -1969,70 +2739,125 @@ function drawLogoVisualizer(cx, cy, coreSize) {
   const hwPale = paleWidth * 0.5;
   const paleBaseRadius = baseRadius + darkWidth * 0.06;
   const paleStrokeWidth = Math.max(1.2, paleWidth * 0.18);
+  const {
+    darkCounts,
+    paleCounts,
+    darkOffsets,
+    paleOffsets,
+    darkCursors,
+    paleCursors,
+    darkItems,
+    paleItems,
+  } = visualizerBatchCache;
+
+  darkCounts.fill(0);
+  paleCounts.fill(0);
+  lastVisualizerBarCount = 0;
+  lastVisualizerDrawBatchCount = 0;
+
+  for (let offset = 0; offset < geometry.length; offset += 3) {
+    const i = geometry[offset];
+    const amplitude = visualizerBars[i];
+    if (amplitude <= deadZone) continue;
+    const length = amplitude * maxBarLength;
+    const darkAlphaIndex = visualizerAlphaBucket(Math.min(0.28, 0.05 + amplitude * 0.62));
+    darkCounts[darkAlphaIndex] += 1;
+    lastVisualizerBarCount += 1;
+    if (profile.drawPaleBars && length > paleMinLength) {
+      const paleAlphaIndex = visualizerAlphaBucket(Math.min(0.2, 0.026 + amplitude * 0.32));
+      paleCounts[paleAlphaIndex] += 1;
+      lastVisualizerBarCount += 1;
+    }
+  }
+
+  let darkTotal = 0;
+  let paleTotal = 0;
+  for (let alpha = 0; alpha < 256; alpha += 1) {
+    darkOffsets[alpha] = darkTotal;
+    paleOffsets[alpha] = paleTotal;
+    darkTotal += darkCounts[alpha];
+    paleTotal += paleCounts[alpha];
+  }
+  darkOffsets[256] = darkTotal;
+  paleOffsets[256] = paleTotal;
+  darkCursors.set(darkOffsets.subarray(0, 256));
+  paleCursors.set(paleOffsets.subarray(0, 256));
+
+  let entryIndex = 0;
+  for (let offset = 0; offset < geometry.length; offset += 3) {
+    const i = geometry[offset];
+    const amplitude = visualizerBars[i];
+    if (amplitude > deadZone) {
+      const length = amplitude * maxBarLength;
+      const darkAlphaIndex = visualizerAlphaBucket(Math.min(0.28, 0.05 + amplitude * 0.62));
+      darkItems[darkCursors[darkAlphaIndex]] = entryIndex;
+      darkCursors[darkAlphaIndex] += 1;
+      if (profile.drawPaleBars && length > paleMinLength) {
+        const paleAlphaIndex = visualizerAlphaBucket(Math.min(0.2, 0.026 + amplitude * 0.32));
+        paleItems[paleCursors[paleAlphaIndex]] = entryIndex;
+        paleCursors[paleAlphaIndex] += 1;
+      }
+    }
+    entryIndex += 1;
+  }
 
   ctx.save();
   ctx.translate(cx, cy);
   ctx.globalCompositeOperation = 'lighter';
-  ctx.rotate(performance.now() / 27000);
+  ctx.rotate(now / 27000);
+  lastCanvasStateChangeCount += 4;
 
-  for (let round = 0; round < visualiserRounds; round += 1) {
-    const roundOffset = (round * Math.PI * 2) / visualiserRounds;
-    for (let i = 0; i < bars; i += profile.visualizerStep) {
+  for (let alpha = 0; alpha < 256; alpha += 1) {
+    const start = darkOffsets[alpha];
+    const end = darkOffsets[alpha + 1];
+    if (start === end) continue;
+    ctx.fillStyle = rgbaWhite[alpha];
+    ctx.beginPath();
+    lastCanvasStateChangeCount += 1;
+    for (let item = start; item < end; item += 1) {
+      const offset = darkItems[item] * 3;
+      const i = geometry[offset];
       const amplitude = visualizerBars[i];
       if (amplitude <= deadZone) continue;
-      const angle = (i / bars) * Math.PI * 2 + roundOffset;
       const length = amplitude * maxBarLength;
+      const cos = geometry[offset + 1];
+      const sin = geometry[offset + 2];
+      addVisualizerBarPath(ctx, cos, sin, baseRadius, length, hwDark);
+    }
+    ctx.fill();
+    lastVisualizerDrawBatchCount += 1;
+  }
 
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const hws = hwDark * sin;
-      const hwc = hwDark * cos;
-      const x0 = baseRadius * cos;
-      const y0 = baseRadius * sin;
-      const x1 = (baseRadius + length) * cos;
-      const y1 = (baseRadius + length) * sin;
-
-      const darkAlpha = Math.min(0.28, 0.05 + amplitude * 0.62);
-      ctx.fillStyle = rgbaWhite[Math.round(darkAlpha * 255)];
+  if (profile.drawPaleBars && paleTotal > 0) {
+    ctx.lineWidth = paleStrokeWidth;
+    lastCanvasStateChangeCount += 1;
+    for (let alpha = 0; alpha < 256; alpha += 1) {
+      const start = paleOffsets[alpha];
+      const end = paleOffsets[alpha + 1];
+      if (start === end) continue;
+      ctx.strokeStyle = rgbaWhite[alpha];
       ctx.beginPath();
-      ctx.moveTo(x0 + hws, y0 - hwc);
-      ctx.lineTo(x1 + hws, y1 - hwc);
-      ctx.lineTo(x1 - hws, y1 + hwc);
-      ctx.lineTo(x0 - hws, y0 + hwc);
-      ctx.closePath();
-      ctx.fill();
-
-      if (profile.drawPaleBars && length > coreSize * 0.022) {
-        const paleAlpha = Math.min(0.2, 0.026 + amplitude * 0.32);
-        const paleLength = length * 0.94;
-        const phws = hwPale * sin;
-        const phwc = hwPale * cos;
-        const px0 = paleBaseRadius * cos;
-        const py0 = paleBaseRadius * sin;
-        const px1 = (paleBaseRadius + paleLength) * cos;
-        const py1 = (paleBaseRadius + paleLength) * sin;
-
-        ctx.strokeStyle = rgbaWhite[Math.round(paleAlpha * 255)];
-        ctx.lineWidth = paleStrokeWidth;
-        ctx.beginPath();
-        ctx.moveTo(px0 + phws, py0 - phwc);
-        ctx.lineTo(px1 + phws, py1 - phwc);
-        ctx.lineTo(px1 - phws, py1 + phwc);
-        ctx.lineTo(px0 - phws, py0 + phwc);
-        ctx.closePath();
-        ctx.stroke();
+      lastCanvasStateChangeCount += 1;
+      for (let item = start; item < end; item += 1) {
+        const offset = paleItems[item] * 3;
+        const i = geometry[offset];
+        const amplitude = visualizerBars[i];
+        const length = amplitude * maxBarLength;
+        const cos = geometry[offset + 1];
+        const sin = geometry[offset + 2];
+        addVisualizerBarPath(ctx, cos, sin, paleBaseRadius, length * 0.94, hwPale);
       }
+      ctx.stroke();
+      lastVisualizerDrawBatchCount += 1;
     }
   }
 
   ctx.restore();
-  performance.mark('dlv-end');
-  performance.measure('drawLogoVisualizer', 'dlv-start', 'dlv-end');
-  const dlvMs = performance.getEntriesByName('drawLogoVisualizer').at(-1)?.duration ?? 0;
-  drawVisualizerAvgMs = drawVisualizerAvgMs * 0.95 + dlvMs * 0.05;
-  performance.clearMeasures('drawLogoVisualizer');
-  performance.clearMarks('dlv-start');
-  performance.clearMarks('dlv-end');
+  lastCanvasStateChangeCount += 1;
+  if (debugPerfEnabled) {
+    const dlvMs = performance.now() - dlvStart;
+    drawVisualizerAvgMs = drawVisualizerAvgMs * 0.95 + dlvMs * 0.05;
+  }
 }
 
 window.addEventListener('resize', scheduleLayoutSync);
@@ -2044,12 +2869,13 @@ window.visualViewport?.addEventListener('scroll', scheduleLayoutSync);
 window.addEventListener('pointermove', (event) => {
   pointerX = event.clientX;
   pointerY = event.clientY;
-  const { height } = readStageSize();
+  const height = cachedStageHeight || readStageSize().height;
   if (event.clientY <= height * 0.2 || app.dataset.panel !== 'idle') touch();
 }, { passive: true });
 let lastLayoutSignature = '';
 setInterval(() => {
-  const { width, height } = readStageSize();
+  const width = window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || cachedStageWidth || 1;
+  const height = window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || cachedStageHeight || 1;
   const signature = `${Math.round(width)}x${Math.round(height)}:${app.dataset.panel}`;
   if (signature === lastLayoutSignature) return;
   lastLayoutSignature = signature;
@@ -2079,33 +2905,33 @@ window.addEventListener('keydown', (event) => {
   runTransportButton(event, button);
 });
 document.addEventListener('visual-transport', (event) => {
-  const button = event.detail ? document.querySelector(`#${event.detail}`) : null;
+  const button = event.detail ? transportButtonsById.get(event.detail) : null;
   runTransportButton(event, button);
 });
 scanPanel.addEventListener('pointerdown', () => touch('scan'));
 songPanel.addEventListener('pointerdown', () => touch('songs'));
 settingsPanel.addEventListener('pointerdown', () => touch('settings'));
 
-document.querySelector('#open-scan').addEventListener('click', () => setPanel('scan'));
-document.querySelector('#open-library').addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
-document.querySelector('#open-settings').addEventListener('click', () => setPanel('settings'));
-document.querySelector('#top-scan').addEventListener('click', () => setPanel('scan'));
-document.querySelector('#top-library').addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
-document.querySelector('#top-settings').addEventListener('click', () => setPanel('settings'));
+openScanButton.addEventListener('click', () => setPanel('scan'));
+openLibraryButton.addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
+openSettingsButton.addEventListener('click', () => setPanel('settings'));
+topScanButton.addEventListener('click', () => setPanel('scan'));
+topLibraryButton.addEventListener('click', () => setPanel(tracks.length ? 'songs' : 'scan'));
+topSettingsButton.addEventListener('click', () => setPanel('settings'));
 minimizeControls.addEventListener('click', () => setPanel('idle'));
-document.querySelector('#close-scan').addEventListener('click', () => setPanel('idle'));
-document.querySelector('#close-library').addEventListener('click', () => setPanel('idle'));
-document.querySelector('#close-settings').addEventListener('click', () => setPanel('idle'));
-document.querySelector('#detect-osu').addEventListener('click', detectOsu);
-document.querySelector('#scan-osu').addEventListener('click', () => scan('osu'));
-document.querySelector('#scan-lazer').addEventListener('click', () => scan('lazer'));
-document.querySelector('#scan-music').addEventListener('click', () => scan('music'));
-document.querySelector('#prev').addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
+closeScanButton.addEventListener('click', () => setPanel('idle'));
+closeLibraryButton.addEventListener('click', () => setPanel('idle'));
+closeSettingsButton.addEventListener('click', () => setPanel('idle'));
+detectOsuButton.addEventListener('click', detectOsu);
+scanOsuButton.addEventListener('click', () => scan('osu'));
+scanLazerButton.addEventListener('click', () => scan('lazer'));
+scanMusicButton.addEventListener('click', () => scan('music'));
+prevButton.addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
 playButton.addEventListener('click', (event) => runTransport(event, togglePlay));
-document.querySelector('#next').addEventListener('click', (event) => runTransport(event, () => stepTrack(1)));
-document.querySelector('#top-prev').addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
+nextButton.addEventListener('click', (event) => runTransport(event, () => stepTrack(1)));
+topPrevButton.addEventListener('click', (event) => runTransport(event, () => stepTrack(-1)));
 topPlayButton.addEventListener('click', (event) => runTransport(event, togglePlay));
-document.querySelector('#top-next').addEventListener('click', (event) => runTransport(event, () => stepTrack(1)));
+topNextButton.addEventListener('click', (event) => runTransport(event, () => stepTrack(1)));
 search.addEventListener('input', renderList);
 
 progress.addEventListener('pointerdown', () => {
@@ -2138,6 +2964,7 @@ audio.addEventListener('pause', () => {
 
 loadSettings();
 resize();
-draw();
+prewarmStarSprites();
+startRenderLoop();
 detectOsu();
 }

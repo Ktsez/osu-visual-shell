@@ -2,9 +2,28 @@
 
 `osu! Visual Shell` 是一个本地运行的 osu! 风格音乐视觉外壳。它不是 osu! 客户端，不包含打图、计分、排行榜或任何游戏模式。项目目标是把本地音乐、osu!stable Songs 文件夹和 osu!lazer 本地曲库转换成一个接近 osu! 主菜单氛围的音乐舞台。
 
-当前版本：`2.0.0-beta.1`
+当前版本：`2.1.0-beta.1`
 
 ## 中文说明
+
+### 这个版本的重点
+
+2.1 beta 是一次以 MacBook Air M1 稳定性和性能诊断为核心的阶段版本。
+
+- Mac / Retina 环境默认启用 `compositeSafeMode`，缓解大面积 CSS 合成链导致的闪屏。
+- 保留 `forceCompositeSafe=1` / `forceCompositeSafe=0` / `noCssFx=1` 作为诊断对照。
+- 增加 `debugPerf`、`fpsOnly`、`perfLog`，用于长期观察 FPS、P95/P99 frame time、cache rebuild、render stage 耗时。
+- 频谱绘制改为 alpha bucket 批处理，保持 `bars/frame` 密度不变，同时减少真实 canvas draw batches。
+- 稳定 star sprite / glow cache，播放稳定期不应持续 rebuild。
+- 保留当前视觉元素、布局、尺寸和交互，不引入低画质模式。
+
+当前限制也很明确：Mac M1 闪屏已经基本缓解，但稳定 60 FPS 目标尚未完全达成。后续优化应继续基于数据定位 Canvas 2D、GPU/compositor、DPR/backing store 和主绘制阶段的真实瓶颈。
+
+详细性能阶段记录见：
+
+```text
+docs/performance-mac-m1-notes.md
+```
 
 ### 主要功能
 
@@ -17,7 +36,7 @@
 - 自动合并同一首歌的重复难度，优先保留带封面的条目。
 - 中央圆盘显示歌曲封面，并跟随音乐能量律动。
 - 圆盘包含留影层、光晕、冲击波和可调参数。
-- 圆盘外侧能量柱由 Web Audio 频谱驱动，并带启动保护，避免歌曲开头炸满。
+- 圆盘外侧能量柱由 Web Audio 频谱驱动。
 - 侧灯参考 osu!lazer 主菜单逻辑：kiai 段左右交替，普通段小节强拍双侧闪动。
 - 星星喷泉会在 kiai 或明显段落爆发时触发。
 - 支持播放、暂停、上一首、下一首、进度拖动、歌曲搜索。
@@ -77,13 +96,48 @@ HOST=0.0.0.0 npm start
 
 读取 lazer 数据目录中的 `client.realm` 和 `files/`。lazer 的文件以 SHA-256 存储，不能只靠文件夹猜测歌曲关系。本项目会优先用 `.osu hash + AudioFilename / BackgroundFile` 在 `client.realm` 中查找对应文件 hash，找不到时才使用保守兜底匹配。
 
+### 性能与诊断 URL
+
+普通使用直接打开：
+
+```text
+http://127.0.0.1:4173/
+```
+
+轻量 FPS 面板：
+
+```text
+http://127.0.0.1:4173/?fpsOnly=1
+```
+
+每 10 秒输出一次性能摘要：
+
+```text
+http://127.0.0.1:4173/?fpsOnly=1&perfLog=1
+```
+
+完整 debug 面板：
+
+```text
+http://127.0.0.1:4173/?debugPerf=1
+```
+
+强制启用或关闭 Mac 合成安全路径：
+
+```text
+http://127.0.0.1:4173/?debugPerf=1&forceCompositeSafe=1
+http://127.0.0.1:4173/?debugPerf=1&forceCompositeSafe=0
+```
+
+注意：`forceCompositeSafe=0` 在 Mac M1 上已确认会严重闪屏，只用于诊断，不应作为 Mac 默认路径。
+
 ### 设置项
 
 - 语言：跟随系统、中文、英文。
 - 侧灯强度：控制左右侧灯整体亮度。
 - 侧灯克制：控制侧灯出现门槛。
 - 圆盘律动：控制中央圆盘缩放幅度。
-- 圆盘光晕强度：控制圆盘周围光晕，可调到 0 关闭。
+- 圆盘光晕强度：控制圆盘周围光晕。
 - 圆盘光晕颜色：自定义圆盘光晕颜色。
 - 圆盘留影强度、大小、延迟、虚化：控制圆盘表面慢半拍的留影感。
 - 能量柱长度、范围、比例、缓降：控制圆盘外侧频谱柱。
@@ -102,12 +156,13 @@ HOST=0.0.0.0 npm start
 
 ### 已知限制
 
-- 这仍是 beta 版本，视觉参数会继续调整。
+- 这仍是 beta 版本，视觉参数和性能策略会继续调整。
+- Mac M1 闪屏已基本缓解，但稳定 60 FPS 仍未完全达成。
 - Safari、移动浏览器和高 DPI 环境仍需要持续验证。
 - 超大曲库扫描会消耗时间。
 - 浏览器可能要求用户点击后才允许播放音频。
 - lazer 的官方 Realm 数据库无法在当前 Node 环境中稳定通过 Realm native 直接打开，因此使用二进制文件使用记录匹配作为主方案。
-- 当前前端主逻辑仍集中在 `src/visual/renderer.js`，后续需要继续拆分。
+- 当前前端主逻辑仍集中在 `src/visual/renderer.js`，但后续不建议盲目大重构，应先继续性能定位。
 
 ### 开发与测试
 
@@ -115,6 +170,7 @@ HOST=0.0.0.0 npm start
 npm test
 node --check server.js
 node --check src/visual/renderer.js
+git diff --check
 ```
 
 本地入口：
@@ -124,21 +180,8 @@ server.js
 src/main.js
 src/visual/renderer.js
 src/server/parseOsuFile.js
+docs/performance-mac-m1-notes.md
 ```
-
-### 版本说明：2.0 beta
-
-2.0 beta 相比 1.0 beta 的重点变化：
-
-- 增加 osu!lazer 曲库检测和扫描。
-- 改进 lazer 音频、曲名、封面匹配。
-- 增加中英文界面和设置内语言切换。
-- 重做顶部控制栏和响应式布局。
-- 改进 Apple Music 风格动态背景。
-- 修复 F11 / 窗口尺寸变化后的背景和列表尺寸问题。
-- 优化侧灯节拍逻辑。
-- 优化能量柱启动阶段，避免歌曲开头爆满导致卡顿。
-- 更新项目文档和交接说明。
 
 ### License
 
@@ -150,7 +193,26 @@ MIT License。详见 `LICENSE`。
 
 `osu! Visual Shell` is a local osu!-inspired music visual shell. It is not an osu! client and does not include gameplay, scoring, leaderboards, or beatmap play. The goal is to turn local music, osu!stable Songs folders, and osu!lazer local libraries into an osu!-style main-menu music stage.
 
-Current version: `2.0.0-beta.1`
+Current version: `2.1.0-beta.1`
+
+### What Changed In This Version
+
+2.1 beta focuses on MacBook Air M1 compositor stability and performance diagnostics.
+
+- `compositeSafeMode` is enabled automatically on Mac / Retina environments.
+- `forceCompositeSafe=1`, `forceCompositeSafe=0`, and `noCssFx=1` remain available as diagnostic paths.
+- `debugPerf`, `fpsOnly`, and `perfLog` provide long-running FPS, frame-time, cache, and render-stage measurements.
+- Spectrum rendering is batched by alpha buckets while preserving visualizer density.
+- Star sprite/glow caches are prewarmed and stabilized.
+- The current visual structure, layout, interactions, and density are preserved.
+
+Mac M1 flashing is largely mitigated, but stable 60 FPS is still an open target. Future work should continue from measured Canvas 2D, GPU/compositor, DPR/backing-store, and render-stage data rather than broad rewrites.
+
+See:
+
+```text
+docs/performance-mac-m1-notes.md
+```
 
 ### Features
 
@@ -201,6 +263,19 @@ Only use LAN exposure when you understand the privacy tradeoff.
 - osu!stable Songs: `.osu` metadata, timing points, audio, and backgrounds.
 - osu!lazer: reads `client.realm` and `files/`, then maps `.osu` files to audio/background hashes as accurately as possible without requiring the osu! client.
 
+### Performance Diagnostics
+
+```text
+http://127.0.0.1:4173/?fpsOnly=1
+http://127.0.0.1:4173/?fpsOnly=1&perfLog=1
+http://127.0.0.1:4173/?debugPerf=1
+http://127.0.0.1:4173/?debugPerf=1&forceCompositeSafe=1
+http://127.0.0.1:4173/?debugPerf=1&forceCompositeSafe=0
+http://127.0.0.1:4173/?debugPerf=1&noCssFx=1
+```
+
+`forceCompositeSafe=0` is diagnostic-only on Mac M1 because it can reintroduce severe flashing.
+
 ### Privacy
 
 - No uploads.
@@ -212,10 +287,11 @@ Only use LAN exposure when you understand the privacy tradeoff.
 ### Known Limits
 
 - This is still a beta.
+- Stable 60 FPS on MacBook Air M1 is not fully solved yet.
 - Very large libraries can take time to scan.
 - Browser autoplay restrictions may require a user click.
 - Safari and mobile browsers still need extra verification.
-- The largest frontend file is still `src/visual/renderer.js` and should be refactored gradually.
+- The largest frontend file is still `src/visual/renderer.js`; future work should continue with profiling before large structural rewrites.
 
 ### Test
 
@@ -223,6 +299,7 @@ Only use LAN exposure when you understand the privacy tradeoff.
 npm test
 node --check server.js
 node --check src/visual/renderer.js
+git diff --check
 ```
 
 ### License
